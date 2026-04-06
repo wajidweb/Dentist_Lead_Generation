@@ -19,6 +19,16 @@ const menuItems = [
     ),
   },
   {
+    label: "Search",
+    href: "/dashboard/search",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    ),
+  },
+  {
     label: "Leads",
     href: "/dashboard/leads",
     icon: (
@@ -91,7 +101,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         <div className="px-6 py-6 border-b border-gray-100 flex items-center justify-between">
           <span
-            className="font-bold text-lg px-3 py-1.5 rounded-md text-black inline-block"
+            className="font-bold text-lg px-3 py-1.5 rounded-xs text-black inline-block"
             style={{ backgroundColor: "#d1ff8f" }}
           >
             DentalLeads
@@ -115,7 +125,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 key={item.href}
                 href={item.href}
                 onClick={handleLinkClick}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-xs text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? "text-black shadow-sm"
                     : "text-gray-500 hover:text-black hover:bg-gray-50"
@@ -132,7 +142,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="px-4 py-6 border-t border-gray-100">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-500 hover:text-black hover:bg-gray-50 transition-all duration-200"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xs text-sm font-medium text-gray-500 hover:text-black hover:bg-gray-50 transition-all duration-200"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>

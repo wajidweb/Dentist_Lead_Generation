@@ -6,11 +6,11 @@ export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#dfefdb] relative overflow-hidden">
       <div
-        className="absolute w-72 h-72 rounded-full opacity-20 blur-3xl animate-[float_8s_ease-in-out_infinite]"
+        className="absolute w-72 h-72 rounded-xs opacity-20 blur-3xl animate-[float_8s_ease-in-out_infinite]"
         style={{ backgroundColor: "#d1ff8f", top: "10%", left: "-5%" }}
       />
       <div
-        className="absolute w-96 h-96 rounded-full opacity-15 blur-3xl animate-[float_10s_ease-in-out_infinite_reverse]"
+        className="absolute w-96 h-96 rounded-xs opacity-15 blur-3xl animate-[float_10s_ease-in-out_infinite_reverse]"
         style={{ backgroundColor: "#d1ff8f", bottom: "-10%", right: "-5%" }}
       />
 
@@ -32,7 +32,7 @@ export default function NotFound() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm text-black transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xs font-semibold text-sm text-black transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
             style={{ backgroundColor: "#d1ff8f" }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -43,7 +43,7 @@ export default function NotFound() {
           </Link>
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm text-gray-600 border border-gray-300 transition-all duration-200 hover:bg-gray-50 hover:text-black"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xs font-semibold text-sm text-gray-600 border border-gray-300 transition-all duration-200 hover:bg-gray-50 hover:text-black"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="7" rx="1"/>

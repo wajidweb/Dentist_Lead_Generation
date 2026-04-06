@@ -48,25 +48,25 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#dfefdb] relative overflow-hidden">
       <div
-        className="absolute w-72 h-72 rounded-full opacity-30 blur-3xl animate-[float_8s_ease-in-out_infinite]"
+        className="absolute w-72 h-72 rounded-xs opacity-30 blur-3xl animate-[float_8s_ease-in-out_infinite]"
         style={{ backgroundColor: "#d1ff8f", top: "-5%", left: "-5%" }}
       />
       <div
-        className="absolute w-96 h-96 rounded-full opacity-20 blur-3xl animate-[float_10s_ease-in-out_infinite_reverse]"
+        className="absolute w-96 h-96 rounded-xs opacity-20 blur-3xl animate-[float_10s_ease-in-out_infinite_reverse]"
         style={{ backgroundColor: "#d1ff8f", bottom: "-10%", right: "-10%" }}
       />
       <div
-        className="absolute w-48 h-48 rounded-full opacity-15 blur-2xl animate-[float_6s_ease-in-out_infinite_1s]"
+        className="absolute w-48 h-48 rounded-xs opacity-15 blur-2xl animate-[float_6s_ease-in-out_infinite_1s]"
         style={{ backgroundColor: "#d1ff8f", top: "40%", right: "20%" }}
       />
 
       <div className="relative w-full max-w-md mx-4 animate-[slideUp_0.6s_ease-out]">
-        <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-xs shadow-2xl border border-gray-100 overflow-hidden">
           <div className="h-1.5" style={{ backgroundColor: "#d1ff8f" }} />
 
           <div className="p-8 sm:p-10">
             <div className="text-center mb-8 animate-[fadeIn_0.8s_ease-out_0.2s_both]">
-              <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl mb-5 font-bold text-lg text-black shadow-sm" style={{ backgroundColor: "#d1ff8f" }}>
+              <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xs mb-5 font-bold text-lg text-black shadow-sm" style={{ backgroundColor: "#d1ff8f" }}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2a7 7 0 0 0-7 7c0 3 2 5.5 4 7.5L12 22l3-5.5c2-2 4-4.5 4-7.5a7 7 0 0 0-7-7z"/>
                   <circle cx="12" cy="9" r="2.5"/>
@@ -81,7 +81,7 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {authError && (
-                <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100 animate-[shake_0.4s_ease-in-out]">
+                <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xs border border-red-100 animate-[shake_0.4s_ease-in-out]">
                   {authError}
                 </div>
               )}
@@ -103,7 +103,7 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="admin@gmail.com"
-                    className="w-full border-2 border-gray-200 rounded-xl pl-11 pr-4 py-3 text-sm text-black placeholder-black/40 focus:outline-none focus:border-[#d1ff8f] bg-gray-50 focus:bg-white transition-all duration-300"
+                    className="w-full border-2 border-gray-200 rounded-xs pl-11 pr-4 py-3 text-sm text-black placeholder-black/40 focus:outline-none focus:border-[#d1ff8f] bg-gray-50 focus:bg-white transition-all duration-300"
                   />
                 </div>
               </div>
@@ -125,7 +125,7 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     placeholder="Enter your password"
-                    className="w-full border-2 border-gray-200 rounded-xl pl-11 pr-4 py-3 text-sm text-black placeholder-black/40 focus:outline-none focus:border-[#d1ff8f] bg-gray-50 focus:bg-white transition-all duration-300"
+                    className="w-full border-2 border-gray-200 rounded-xs pl-11 pr-4 py-3 text-sm text-black placeholder-black/40 focus:outline-none focus:border-[#d1ff8f] bg-gray-50 focus:bg-white transition-all duration-300"
                   />
                 </div>
               </div>
@@ -134,7 +134,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-3 rounded-xl font-bold text-black text-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
+                  className="w-full py-3 rounded-xs font-bold text-black text-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
                   style={{ backgroundColor: "#d1ff8f" }}
                 >
                   {submitting ? (

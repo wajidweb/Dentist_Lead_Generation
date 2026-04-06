@@ -47,7 +47,7 @@ export default function DashboardLayout({
         <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 sticky top-0 z-30">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition"
+            className="p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-xs transition"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="3" y1="6" x2="21" y2="6"/>
@@ -56,7 +56,7 @@ export default function DashboardLayout({
             </svg>
           </button>
           <span
-            className="font-bold text-sm px-2.5 py-1 rounded-md text-black"
+            className="font-bold text-sm px-2.5 py-1 rounded-xs text-black"
             style={{ backgroundColor: "#d1ff8f" }}
           >
             DentalLeads
