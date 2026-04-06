@@ -1,6 +1,6 @@
 "use client";
 
-import { Lead } from "../page";
+import { Lead } from "../types";
 
 interface Props {
   leads: Lead[];

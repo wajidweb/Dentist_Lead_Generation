@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lead } from "../page";
+import { Lead } from "../types";
 
 interface Props {
   lead: Lead | null;
