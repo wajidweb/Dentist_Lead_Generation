@@ -4,6 +4,7 @@ interface LeadFilters {
   page?: number;
   limit?: number;
   status?: string;
+  category?: string;
   city?: string;
   minLeadScore?: number;
   maxLeadScore?: number;
@@ -19,6 +20,7 @@ export async function getLeads(filters: LeadFilters) {
     page = 1,
     limit = 20,
     status,
+    category,
     city,
     minLeadScore,
     maxLeadScore,
@@ -32,6 +34,7 @@ export async function getLeads(filters: LeadFilters) {
   const query: Record<string, unknown> = {};
 
   if (status) query.status = status;
+  if (category) query.leadCategory = category;
   if (city) query.city = { $regex: city, $options: "i" };
   if (search) query.businessName = { $regex: search, $options: "i" };
 
@@ -109,6 +112,19 @@ export async function deleteLead(id: string) {
   return Lead.findByIdAndDelete(id);
 }
 
+export async function bulkDeleteLeads(ids: string[]) {
+  const result = await Lead.deleteMany({ _id: { $in: ids } });
+  return result.deletedCount;
+}
+
+export async function bulkUpdateLeadStatus(ids: string[], status: string) {
+  const result = await Lead.updateMany(
+    { _id: { $in: ids } },
+    { $set: { status } }
+  );
+  return result.modifiedCount;
+}
+
 export async function getDashboardStats() {
   const [
     totalLeads,
@@ -130,6 +146,13 @@ export async function getDashboardStats() {
     Lead.countDocuments({ status: "lost" }),
   ]);
 
+  const [hotLeads, warmLeads, coolLeads, skipLeads] = await Promise.all([
+    Lead.countDocuments({ leadCategory: "hot" }),
+    Lead.countDocuments({ leadCategory: "warm" }),
+    Lead.countDocuments({ leadCategory: "cool" }),
+    Lead.countDocuments({ leadCategory: "skip" }),
+  ]);
+
   const topCities = await Lead.aggregate([
     { $group: { _id: "$city", count: { $sum: 1 } } },
     { $sort: { count: -1 } },
@@ -149,5 +172,6 @@ export async function getDashboardStats() {
     revenue: converted * 199,
     conversionRate: emailSent > 0 ? ((converted / emailSent) * 100).toFixed(1) : "0",
     topCities,
+    categories: { hot: hotLeads, warm: warmLeads, cool: coolLeads, skip: skipLeads },
   };
 }

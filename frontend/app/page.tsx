@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { useAuthStore } from "./store/authStore";
 import { MapPin, Mail, Lock, Loader2 } from "lucide-react";
 
@@ -28,7 +29,10 @@ export default function LoginPage() {
     setSubmitting(true);
     const success = await loginAdmin({ email, password });
     if (success) {
+      toast.success("Welcome back!");
       router.push("/dashboard");
+    } else {
+      toast.error("Invalid credentials");
     }
     setSubmitting(false);
   };
