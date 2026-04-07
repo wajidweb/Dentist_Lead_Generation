@@ -1,0 +1,203 @@
+import { create } from "zustand";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+
+interface Review {
+  author: string;
+  rating: number;
+  text: string;
+  date: string;
+  relativeTime?: string;
+}
+
+export interface Lead {
+  _id: string;
+  businessName: string;
+  address: string;
+  city: string;
+  state: string;
+  phone: string;
+  website: string;
+  googlePlaceId: string;
+  googleMapsUrl: string;
+  googleRating: number;
+  googleReviewCount: number;
+  reviews: Review[];
+  email?: string;
+  emailSource?: string;
+  websiteAnalysis?: {
+    overallScore: number;
+    performanceScore: number;
+    seoScore: number;
+    visualScore: number;
+    contentScore: number;
+    issues: string[];
+    screenshots?: { desktop: string; mobile: string };
+  };
+  leadScore?: number;
+  leadCategory?: "hot" | "warm" | "cool" | "skip";
+  status: string;
+  customWebsiteUrl?: string;
+  customWebsiteScreenshot?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface DashboardStats {
+  totalLeads: number;
+  discovered: number;
+  analyzed: number;
+  qualified: number;
+  emailSent: number;
+  replied: number;
+  converted: number;
+  lost: number;
+  revenue: number;
+  conversionRate: string;
+  topCities: Array<{ city: string; count: number }>;
+}
+
+interface LeadsStore {
+  leads: Lead[];
+  currentLead: Lead | null;
+  total: number;
+  page: number;
+  totalPages: number;
+  loading: boolean;
+  detailLoading: boolean;
+  error: string | null;
+  stats: DashboardStats | null;
+  statsLoading: boolean;
+
+  fetchLeads: (params: Record<string, string | number | undefined>) => Promise<void>;
+  fetchLeadDetail: (id: string) => Promise<void>;
+  updateLeadStatus: (id: string, status: string) => Promise<void>;
+  deleteLead: (id: string) => Promise<void>;
+  fetchDashboardStats: () => Promise<void>;
+  clearCurrentLead: () => void;
+}
+
+export const useLeadsStore = create<LeadsStore>((set, get) => ({
+  leads: [],
+  currentLead: null,
+  total: 0,
+  page: 1,
+  totalPages: 0,
+  loading: false,
+  detailLoading: false,
+  error: null,
+  stats: null,
+  statsLoading: false,
+
+  fetchLeads: async (params) => {
+    set({ loading: true, error: null });
+    const token = localStorage.getItem("token");
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== "") query.set(k, String(v));
+    });
+    try {
+      const res = await fetch(`${API_URL}/leads?${query}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        set({ loading: false, error: data.message || "Failed to fetch leads" });
+        return;
+      }
+      set({
+        loading: false,
+        leads: data.leads,
+        total: data.total,
+        page: data.page,
+        totalPages: data.totalPages,
+      });
+    } catch {
+      set({ loading: false, error: "Unable to connect to server" });
+    }
+  },
+
+  fetchLeadDetail: async (id) => {
+    set({ detailLoading: true });
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_URL}/leads/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        set({ detailLoading: false });
+        return;
+      }
+      set({ detailLoading: false, currentLead: data.lead });
+    } catch {
+      set({ detailLoading: false });
+    }
+  },
+
+  updateLeadStatus: async (id, status) => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_URL}/leads/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok) return;
+      const updatedLead = data.lead as Lead;
+      const { leads, currentLead } = get();
+      const idx = leads.findIndex((l) => l._id === updatedLead._id);
+      const newLeads = [...leads];
+      if (idx !== -1) newLeads[idx] = updatedLead;
+      set({
+        leads: newLeads,
+        currentLead: currentLead?._id === updatedLead._id ? updatedLead : currentLead,
+      });
+    } catch {
+      // silent fail
+    }
+  },
+
+  deleteLead: async (id) => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_URL}/leads/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const { leads, total } = get();
+      set({
+        leads: leads.filter((l) => l._id !== id),
+        total: total - 1,
+      });
+    } catch {
+      // silent fail
+    }
+  },
+
+  fetchDashboardStats: async () => {
+    set({ statsLoading: true });
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_URL}/leads/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        set({ statsLoading: false });
+        return;
+      }
+      set({ statsLoading: false, stats: data });
+    } catch {
+      set({ statsLoading: false });
+    }
+  },
+
+  clearCurrentLead: () => set({ currentLead: null }),
+}));
