@@ -52,6 +52,7 @@ interface SearchStore {
     targetLeads?: number;
   }) => Promise<void>;
   fetchSearchHistory: () => Promise<void>;
+  deleteSearchHistory: (id: string) => Promise<void>;
   clearResults: () => void;
 }
 
@@ -93,6 +94,18 @@ export const useSearchStore = create<SearchStore>((set) => ({
       set({ historyLoading: false, history: data.searches });
     } catch {
       set({ historyLoading: false });
+    }
+  },
+
+  deleteSearchHistory: async (id) => {
+    try {
+      const res = await apiFetch(`/search/history/${id}`, { method: "DELETE" });
+      if (!res.ok) return;
+      set((state) => ({
+        history: state.history.filter((item) => item._id !== id),
+      }));
+    } catch {
+      // silent fail
     }
   },
 

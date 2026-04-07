@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import {
   searchDentists,
   getSearchHistory,
+  deleteSearchHistory,
   autocompleteCities as autocompleteCitiesService,
 } from "../services/googlePlacesService";
 
@@ -15,7 +16,7 @@ export const search = async (req: Request, res: Response) => {
       return;
     }
 
-    const target = Math.min(Math.max(Number(targetLeads), 1), 100);
+    const target = Math.max(Number(targetLeads), 1);
 
     const result = await searchDentists(
       location.trim(),
@@ -46,6 +47,21 @@ export const autocompleteCities = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Autocomplete error:", error);
     res.json({ suggestions: [] });
+  }
+};
+
+export const deleteHistory = async (req: Request, res: Response) => {
+  try {
+    const userEmail = req.userEmail!;
+    const deleted = await deleteSearchHistory(req.params.id as string, userEmail);
+    if (!deleted) {
+      res.status(404).json({ message: "Search history not found" });
+      return;
+    }
+    res.json({ message: "Search history deleted" });
+  } catch (error) {
+    console.error("Delete history error:", error);
+    res.status(500).json({ message: "Failed to delete search history" });
   }
 };
 

@@ -2,19 +2,20 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, MapPin, Clock, Star, Check, X, Loader2 } from "lucide-react";
+import { Search, MapPin, Clock, Star, Check, X, Loader2, Trash2, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import { useSearchStore } from "../../store/searchStore";
 import CityAutocomplete from "../../components/CityAutocomplete";
 
 export default function SearchPage() {
-  const { results, history, loading, historyLoading, error, searchDentists, fetchSearchHistory, clearResults } = useSearchStore();
+  const { results, history, loading, historyLoading, error, searchDentists, fetchSearchHistory, deleteSearchHistory, clearResults } = useSearchStore();
 
   const [location, setLocation] = useState("");
   const [minRating, setMinRating] = useState("3.5");
   const [minReviews, setMinReviews] = useState("10");
   const [targetLeads, setTargetLeads] = useState("20");
   const [mounted, setMounted] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; location: string } | null>(null);
 
   useEffect(() => {
     fetchSearchHistory();
@@ -107,7 +108,6 @@ export default function SearchPage() {
                   value={targetLeads}
                   onChange={(e) => setTargetLeads(e.target.value)}
                   min="1"
-                  max="100"
                   placeholder="20"
                   className="w-full border border-[#DDD8D0] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/30 focus:bg-white transition-all tabular-nums"
                 />
@@ -376,12 +376,20 @@ export default function SearchPage() {
                     </span>
                   </div>
                 </div>
-                <button
-                  onClick={() => setLocation(item.location)}
-                  className="text-xs font-medium text-[#8A9590] hover:text-[#1A2E22] px-3 py-1.5 rounded-xs hover:bg-[#F0ECE4] transition opacity-0 group-hover:opacity-100"
-                >
-                  Search again
-                </button>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                  <button
+                    onClick={() => setLocation(item.location)}
+                    className="text-xs font-medium text-[#8A9590] hover:text-[#1A2E22] px-3 py-1.5 rounded-xs hover:bg-[#F0ECE4] transition"
+                  >
+                    Search again
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm({ id: item._id, location: item.location })}
+                    className="text-[#8A9590] hover:text-[#C75555] p-1.5 rounded-xs hover:bg-[#C75555]/10 transition"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -398,11 +406,62 @@ export default function SearchPage() {
         )}
       </div>
 
+      {/* Delete Confirm Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xs border border-[#E8E2D8] shadow-xl w-full max-w-sm mx-4 overflow-hidden animate-[slideUp_0.2s_ease-out]">
+            <div className="p-6 text-center">
+              <div className="w-12 h-12 rounded-xs bg-[#C75555]/10 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle size={24} className="text-[#C75555]" />
+              </div>
+              <h3 className="text-base font-semibold text-[#1A2E22] mb-1">
+                Delete Search History
+              </h3>
+              <p className="text-sm text-[#8A9590]">
+                Are you sure you want to delete the search for{" "}
+                <span className="font-medium text-[#1A2E22]">
+                  {deleteConfirm.location}
+                </span>
+                ? This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex border-t border-[#E8E2D8]">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 px-4 py-3 text-sm font-medium text-[#5A6B60] hover:bg-[#FAF8F5] transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteSearchHistory(deleteConfirm.id);
+                  toast.success("Search history deleted");
+                  setDeleteConfirm(null);
+                }}
+                className="flex-1 px-4 py-3 text-sm font-semibold text-[#C75555] hover:bg-[#C75555]/5 transition border-l border-[#E8E2D8]"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx global>{`
         @keyframes fadeInRow {
           from {
             opacity: 0;
             transform: translateY(4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
           }
           to {
             opacity: 1;

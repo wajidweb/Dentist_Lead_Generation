@@ -5,7 +5,6 @@ import SearchHistory from "../models/SearchHistory";
 import SearchProgress, { IQueryProgress } from "../models/SearchProgress";
 
 const PLACES_BASE = "https://places.googleapis.com/v1";
-const MAX_PAGES_HARD_LIMIT = 10;
 
 // Service account auth — gets OAuth2 access token
 const auth = new GoogleAuth({
@@ -130,11 +129,32 @@ function getQueryVariations(location: string): string[] {
     `dental practice ${location}`,
     `pediatric dentist ${location}`,
     `emergency dentist ${location}`,
+    `orthodontist in ${location}`,
+    `endodontist in ${location}`,
+    `periodontist in ${location}`,
+    `oral surgeon ${location}`,
+    `dental implant ${location}`,
+    `teeth whitening ${location}`,
+    `dental hygienist ${location}`,
+    `prosthodontist ${location}`,
+    `dental specialist ${location}`,
+    `sedation dentist ${location}`,
+    `holistic dentist ${location}`,
+    `affordable dentist ${location}`,
+    `best dentist ${location}`,
+    `top rated dentist ${location}`,
+    `dentist near ${location}`,
+    `dental center ${location}`,
+    `dental group ${location}`,
+    `dental associates ${location}`,
+    `general dentist ${location}`,
+    `dental surgery ${location}`,
   ];
 }
 
 async function getOrCreateProgress(location: string, userEmail: string) {
   const normalized = location.toLowerCase().trim();
+  const allVariations = getQueryVariations(location);
 
   // Atomic upsert — no race condition
   const progress = await SearchProgress.findOneAndUpdate(
@@ -143,7 +163,7 @@ async function getOrCreateProgress(location: string, userEmail: string) {
       $setOnInsert: {
         userEmail,
         location: normalized,
-        queries: getQueryVariations(location).map((q) => ({
+        queries: allVariations.map((q) => ({
           query: q,
           nextPageToken: null,
           exhausted: false,
@@ -156,6 +176,23 @@ async function getOrCreateProgress(location: string, userEmail: string) {
     },
     { upsert: true, new: true }
   );
+
+  // If existing progress has fewer queries than current variations,
+  // append the new ones so old locations benefit from new query types
+  const existingQueries = new Set(progress.queries.map((q) => q.query));
+  const newQueries = allVariations.filter((q) => !existingQueries.has(q));
+
+  if (newQueries.length > 0) {
+    for (const q of newQueries) {
+      progress.queries.push({
+        query: q,
+        nextPageToken: null,
+        exhausted: false,
+        pagesSearched: 0,
+      });
+    }
+    await progress.save();
+  }
 
   return progress;
 }
@@ -186,13 +223,13 @@ export async function searchDentists(
   let pagesSearched = 0;
   let allExhausted = false;
 
-  // Resume from where we left off
+  // Resume from where we left off — no page limit, stops only when
+  // target is reached or all query variations are exhausted
   let queryIdx = progress.currentQueryIndex;
 
   while (
     newLeads.length < targetLeads &&
-    queryIdx < progress.queries.length &&
-    pagesSearched < MAX_PAGES_HARD_LIMIT
+    queryIdx < progress.queries.length
   ) {
     const qp = progress.queries[queryIdx];
 
@@ -295,6 +332,10 @@ export async function searchDentists(
 
 export async function getSearchHistory(userEmail: string) {
   return SearchHistory.find({ userEmail }).sort({ searchedAt: -1 }).limit(50);
+}
+
+export async function deleteSearchHistory(id: string, userEmail: string) {
+  return SearchHistory.findOneAndDelete({ _id: id, userEmail });
 }
 
 export async function autocompleteCities(input: string): Promise<
