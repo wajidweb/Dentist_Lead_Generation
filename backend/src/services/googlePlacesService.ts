@@ -1,8 +1,26 @@
+import { GoogleAuth } from "google-auth-library";
+import path from "path";
 import Lead from "../models/Lead";
 import SearchHistory from "../models/SearchHistory";
 
-const GOOGLE_API_KEY = () => process.env.GOOGLE_PLACES_API_KEY || "";
 const PLACES_BASE = "https://places.googleapis.com/v1";
+
+// Service account auth — gets OAuth2 access token
+const auth = new GoogleAuth({
+  keyFile: path.resolve(
+    process.env.GOOGLE_APPLICATION_CREDENTIALS || "./google-credentials.json"
+  ),
+  scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+});
+
+async function getAccessToken(): Promise<string> {
+  const client = await auth.getClient();
+  const tokenResponse = await client.getAccessToken();
+  if (!tokenResponse.token) {
+    throw new Error("Failed to obtain Google access token");
+  }
+  return tokenResponse.token;
+}
 
 interface PlaceResult {
   id: string;
@@ -40,6 +58,8 @@ async function textSearch(
   query: string,
   pageToken?: string
 ): Promise<TextSearchResponse> {
+  const accessToken = await getAccessToken();
+
   const fieldMask = [
     "places.id",
     "places.displayName",
@@ -66,7 +86,7 @@ async function textSearch(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Goog-Api-Key": GOOGLE_API_KEY(),
+      Authorization: `Bearer ${accessToken}`,
       "X-Goog-FieldMask": fieldMask,
     },
     body: JSON.stringify(body),
