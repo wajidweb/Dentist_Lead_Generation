@@ -2,21 +2,27 @@ import { Request, Response } from "express";
 import {
   searchDentists,
   getSearchHistory,
+  autocompleteCities as autocompleteCitiesService,
 } from "../services/googlePlacesService";
 
 export const search = async (req: Request, res: Response) => {
   try {
-    const { location, minRating = 3.5, minReviews = 10 } = req.body;
+    const { location, minRating = 3.5, minReviews = 10, targetLeads = 20 } = req.body;
+    const userEmail = req.userEmail!;
 
-    if (!location) {
+    if (!location || !location.trim()) {
       res.status(400).json({ message: "Location is required" });
       return;
     }
 
+    const target = Math.min(Math.max(Number(targetLeads), 1), 100);
+
     const result = await searchDentists(
-      location,
+      location.trim(),
       Number(minRating),
-      Number(minReviews)
+      Number(minReviews),
+      target,
+      userEmail
     );
 
     res.json(result);
@@ -28,9 +34,25 @@ export const search = async (req: Request, res: Response) => {
   }
 };
 
-export const history = async (_req: Request, res: Response) => {
+export const autocompleteCities = async (req: Request, res: Response) => {
   try {
-    const searches = await getSearchHistory();
+    const input = req.query.q as string;
+    if (!input || input.length < 1) {
+      res.json({ suggestions: [] });
+      return;
+    }
+    const suggestions = await autocompleteCitiesService(input);
+    res.json({ suggestions });
+  } catch (error) {
+    console.error("Autocomplete error:", error);
+    res.json({ suggestions: [] });
+  }
+};
+
+export const history = async (req: Request, res: Response) => {
+  try {
+    const userEmail = req.userEmail!;
+    const searches = await getSearchHistory(userEmail);
     res.json({ searches });
   } catch (error) {
     console.error("Search history error:", error);

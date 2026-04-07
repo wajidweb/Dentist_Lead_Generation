@@ -1,6 +1,5 @@
 import { create } from "zustand";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+import { apiFetch } from "../lib/api";
 
 interface Review {
   author: string;
@@ -56,6 +55,7 @@ interface DashboardStats {
   revenue: number;
   conversionRate: string;
   topCities: Array<{ city: string; count: number }>;
+  categories: { hot: number; warm: number; cool: number; skip: number };
 }
 
 interface LeadsStore {
@@ -76,6 +76,8 @@ interface LeadsStore {
   deleteLead: (id: string) => Promise<void>;
   fetchDashboardStats: () => Promise<void>;
   clearCurrentLead: () => void;
+  bulkDeleteLeads: (ids: string[]) => Promise<number>;
+  bulkUpdateStatus: (ids: string[], status: string) => Promise<number>;
 }
 
 export const useLeadsStore = create<LeadsStore>((set, get) => ({
@@ -92,15 +94,12 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
 
   fetchLeads: async (params) => {
     set({ loading: true, error: null });
-    const token = localStorage.getItem("token");
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== "") query.set(k, String(v));
     });
     try {
-      const res = await fetch(`${API_URL}/leads?${query}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/leads?${query}`);
       const data = await res.json();
       if (!res.ok) {
         set({ loading: false, error: data.message || "Failed to fetch leads" });
@@ -120,11 +119,8 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
 
   fetchLeadDetail: async (id) => {
     set({ detailLoading: true });
-    const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_URL}/leads/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/leads/${id}`);
       const data = await res.json();
       if (!res.ok) {
         set({ detailLoading: false });
@@ -137,14 +133,9 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
   },
 
   updateLeadStatus: async (id, status) => {
-    const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_URL}/leads/${id}/status`, {
+      const res = await apiFetch(`/leads/${id}/status`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ status }),
       });
       const data = await res.json();
@@ -164,11 +155,9 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
   },
 
   deleteLead: async (id) => {
-    const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_URL}/leads/${id}`, {
+      const res = await apiFetch(`/leads/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
       const { leads, total } = get();
@@ -183,11 +172,8 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
 
   fetchDashboardStats: async () => {
     set({ statsLoading: true });
-    const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_URL}/leads/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/leads/stats`);
       const data = await res.json();
       if (!res.ok) {
         set({ statsLoading: false });
@@ -200,4 +186,53 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
   },
 
   clearCurrentLead: () => set({ currentLead: null }),
+
+  bulkDeleteLeads: async (ids) => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_URL}/leads/bulk-delete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) return 0;
+      const { leads, total } = get();
+      set({
+        leads: leads.filter((l) => !ids.includes(l._id)),
+        total: total - (data.count || 0),
+      });
+      return data.count || 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  bulkUpdateStatus: async (ids, status) => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_URL}/leads/bulk-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ids, status }),
+      });
+      const data = await res.json();
+      if (!res.ok) return 0;
+      const { leads } = get();
+      set({
+        leads: leads.map((l) =>
+          ids.includes(l._id) ? { ...l, status } : l
+        ),
+      });
+      return data.count || 0;
+    } catch {
+      return 0;
+    }
+  },
 }));

@@ -7,12 +7,16 @@ import {
   update,
   remove,
   stats,
+  bulkRemove,
+  bulkChangeStatus,
 } from "../controllers/leadsController";
 
 const router = Router();
 
 router.get("/", authMiddleware, list);
 router.get("/stats", authMiddleware, stats);
+router.post("/bulk-delete", authMiddleware, bulkRemove);
+router.post("/bulk-status", authMiddleware, bulkChangeStatus);
 router.get("/:id", authMiddleware, detail);
 router.patch("/:id", authMiddleware, update);
 router.patch("/:id/status", authMiddleware, changeStatus);
