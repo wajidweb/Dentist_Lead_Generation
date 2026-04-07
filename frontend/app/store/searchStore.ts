@@ -1,6 +1,5 @@
 import { create } from "zustand";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+import { apiFetch } from "../lib/api";
 
 interface Lead {
   _id: string;
@@ -23,6 +22,10 @@ interface SearchResult {
   location: string;
   totalFromGoogle: number;
   leadsCreated: number;
+  skippedExisting: number;
+  pagesSearched: number;
+  totalLeadsForLocation: number;
+  allExhausted: boolean;
   leads: Lead[];
 }
 
@@ -46,6 +49,7 @@ interface SearchStore {
     location: string;
     minRating?: number;
     minReviews?: number;
+    targetLeads?: number;
   }) => Promise<void>;
   fetchSearchHistory: () => Promise<void>;
   clearResults: () => void;
@@ -60,14 +64,9 @@ export const useSearchStore = create<SearchStore>((set) => ({
 
   searchDentists: async (params) => {
     set({ loading: true, error: null, results: null });
-    const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_URL}/search/dentists`, {
+      const res = await apiFetch("/search/dentists", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(params),
       });
       const data = await res.json();
@@ -76,18 +75,16 @@ export const useSearchStore = create<SearchStore>((set) => ({
         return;
       }
       set({ loading: false, results: data });
-    } catch {
-      set({ loading: false, error: "Unable to connect to server" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unable to connect to server";
+      set({ loading: false, error: msg });
     }
   },
 
   fetchSearchHistory: async () => {
     set({ historyLoading: true });
-    const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_URL}/search/history`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch("/search/history");
       const data = await res.json();
       if (!res.ok) {
         set({ historyLoading: false });

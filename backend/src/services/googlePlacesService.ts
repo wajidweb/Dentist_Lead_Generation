@@ -2,8 +2,10 @@ import { GoogleAuth } from "google-auth-library";
 import path from "path";
 import Lead from "../models/Lead";
 import SearchHistory from "../models/SearchHistory";
+import SearchProgress, { IQueryProgress } from "../models/SearchProgress";
 
 const PLACES_BASE = "https://places.googleapis.com/v1";
+const MAX_PAGES_HARD_LIMIT = 10;
 
 // Service account auth — gets OAuth2 access token
 const auth = new GoogleAuth({
@@ -54,6 +56,22 @@ function parseLocation(location: string): { city: string; state: string } {
   };
 }
 
+function isQualified(
+  place: PlaceResult,
+  minRating: number,
+  minReviews: number
+): boolean {
+  if (place.businessStatus && place.businessStatus !== "OPERATIONAL")
+    return false;
+  if (!place.rating || place.rating < minRating) return false;
+  if (!place.userRatingCount || place.userRatingCount < minReviews)
+    return false;
+  if (!place.websiteUri) return false;
+  const site = place.websiteUri.toLowerCase();
+  if (site.includes("facebook.com") || site.includes("yelp.com")) return false;
+  return true;
+}
+
 async function textSearch(
   query: string,
   pageToken?: string
@@ -100,17 +118,61 @@ async function textSearch(
   return res.json() as Promise<TextSearchResponse>;
 }
 
+function getQueryVariations(location: string): string[] {
+  return [
+    `dentist in ${location}`,
+    `dental clinic in ${location}`,
+    `dental office in ${location}`,
+    `dentistry ${location}`,
+    `family dentist ${location}`,
+    `cosmetic dentist ${location}`,
+    `dental care ${location}`,
+    `dental practice ${location}`,
+    `pediatric dentist ${location}`,
+    `emergency dentist ${location}`,
+  ];
+}
+
+async function getOrCreateProgress(location: string, userEmail: string) {
+  const normalized = location.toLowerCase().trim();
+
+  // Atomic upsert — no race condition
+  const progress = await SearchProgress.findOneAndUpdate(
+    { userEmail, location: normalized },
+    {
+      $setOnInsert: {
+        userEmail,
+        location: normalized,
+        queries: getQueryVariations(location).map((q) => ({
+          query: q,
+          nextPageToken: null,
+          exhausted: false,
+          pagesSearched: 0,
+        })),
+        currentQueryIndex: 0,
+        totalLeadsFetched: 0,
+        updatedAt: new Date(),
+      },
+    },
+    { upsert: true, new: true }
+  );
+
+  return progress;
+}
+
 export async function searchDentists(
   location: string,
   minRating: number = 3.5,
   minReviews: number = 10,
-  maxPages: number = 3
+  targetLeads: number = 20,
+  userEmail: string
 ) {
-  const query = `dentist in ${location}`;
   const { city, state } = parseLocation(location);
+  const progress = await getOrCreateProgress(location, userEmail);
 
   const searchHistory = await SearchHistory.create({
-    query,
+    userEmail,
+    query: `dentist in ${location}`,
     location,
     minRating,
     minReviews,
@@ -118,78 +180,162 @@ export async function searchDentists(
     leadsCreated: 0,
   });
 
-  const allPlaces: PlaceResult[] = [];
-  let nextPageToken: string | undefined;
+  const newLeads: InstanceType<typeof Lead>[] = [];
+  const skippedIds = new Set<string>();
+  let totalFromGoogle = 0;
+  let pagesSearched = 0;
+  let allExhausted = false;
 
-  for (let page = 0; page < maxPages; page++) {
-    const response = await textSearch(query, nextPageToken);
-    if (response.places) {
-      allPlaces.push(...response.places);
-    }
-    nextPageToken = response.nextPageToken;
-    if (!nextPageToken) break;
-  }
+  // Resume from where we left off
+  let queryIdx = progress.currentQueryIndex;
 
-  searchHistory.totalResultsFromGoogle = allPlaces.length;
+  while (
+    newLeads.length < targetLeads &&
+    queryIdx < progress.queries.length &&
+    pagesSearched < MAX_PAGES_HARD_LIMIT
+  ) {
+    const qp = progress.queries[queryIdx];
 
-  const qualified = allPlaces.filter((place) => {
-    if (place.businessStatus && place.businessStatus !== "OPERATIONAL") return false;
-    if (!place.rating || place.rating < minRating) return false;
-    if (!place.userRatingCount || place.userRatingCount < minReviews) return false;
-    if (!place.websiteUri) return false;
-    const site = place.websiteUri.toLowerCase();
-    if (site.includes("facebook.com") || site.includes("yelp.com")) return false;
-    return true;
-  });
-
-  const leads = [];
-  for (const place of qualified) {
-    const existing = await Lead.findOne({ googlePlaceId: place.id });
-    if (existing) {
-      leads.push(existing);
+    // Skip queries that are fully exhausted (no more pages)
+    if (qp.exhausted) {
+      queryIdx++;
       continue;
     }
 
-    const reviews = (place.reviews || []).map((r) => ({
-      author: r.authorAttribution?.displayName || "Anonymous",
-      rating: r.rating || 0,
-      text: r.text?.text || "",
-      date: r.publishTime ? new Date(r.publishTime) : new Date(),
-      relativeTime: r.relativePublishTimeDescription,
-    }));
+    // Use saved pageToken to resume from last position
+    const pageToken = qp.nextPageToken || undefined;
 
-    const lead = await Lead.create({
-      businessName: place.displayName?.text || "Unknown",
-      address: place.formattedAddress || "",
-      city,
-      state,
-      phone: place.nationalPhoneNumber || "",
-      website: place.websiteUri!,
-      googlePlaceId: place.id,
-      googleMapsUrl: place.googleMapsUri || "",
-      googleRating: place.rating!,
-      googleReviewCount: place.userRatingCount!,
-      reviews,
-      status: "discovered",
-      searchQuery: query,
-      searchId: searchHistory._id,
-    });
+    const response = await textSearch(qp.query, pageToken);
+    pagesSearched++;
+    qp.pagesSearched++;
 
-    leads.push(lead);
+    if (!response.places || response.places.length === 0) {
+      qp.exhausted = true;
+      qp.nextPageToken = null;
+      queryIdx++;
+      continue;
+    }
+
+    totalFromGoogle += response.places.length;
+
+    for (const place of response.places) {
+      if (newLeads.length >= targetLeads) break;
+      if (skippedIds.has(place.id)) continue;
+      if (!isQualified(place, minRating, minReviews)) continue;
+
+      const existing = await Lead.findOne({ googlePlaceId: place.id });
+      if (existing) {
+        skippedIds.add(place.id);
+        continue;
+      }
+
+      const reviews = (place.reviews || []).map((r) => ({
+        author: r.authorAttribution?.displayName || "Anonymous",
+        rating: r.rating || 0,
+        text: r.text?.text || "",
+        date: r.publishTime ? new Date(r.publishTime) : new Date(),
+        relativeTime: r.relativePublishTimeDescription,
+      }));
+
+      const lead = await Lead.create({
+        businessName: place.displayName?.text || "Unknown",
+        address: place.formattedAddress || "",
+        city,
+        state,
+        phone: place.nationalPhoneNumber || "",
+        website: place.websiteUri!,
+        googlePlaceId: place.id,
+        googleMapsUrl: place.googleMapsUri || "",
+        googleRating: place.rating!,
+        googleReviewCount: place.userRatingCount!,
+        reviews,
+        status: "discovered",
+        searchQuery: qp.query,
+        searchId: searchHistory._id,
+      });
+
+      newLeads.push(lead);
+    }
+
+    // Save page token for next time
+    if (response.nextPageToken) {
+      qp.nextPageToken = response.nextPageToken;
+    } else {
+      qp.exhausted = true;
+      qp.nextPageToken = null;
+      queryIdx++;
+    }
   }
 
-  searchHistory.leadsCreated = leads.length;
+  // Check if all queries are exhausted
+  allExhausted = progress.queries.every((q) => q.exhausted);
+
+  // Save progress for next search on this location
+  progress.currentQueryIndex = Math.min(queryIdx, progress.queries.length - 1);
+  progress.totalLeadsFetched += newLeads.length;
+  progress.updatedAt = new Date();
+  await progress.save();
+
+  searchHistory.totalResultsFromGoogle = totalFromGoogle;
+  searchHistory.leadsCreated = newLeads.length;
   await searchHistory.save();
 
   return {
     searchId: searchHistory._id,
     location,
-    totalFromGoogle: allPlaces.length,
-    leadsCreated: leads.length,
-    leads,
+    totalFromGoogle,
+    leadsCreated: newLeads.length,
+    skippedExisting: skippedIds.size,
+    pagesSearched,
+    totalLeadsForLocation: progress.totalLeadsFetched,
+    allExhausted,
+    leads: newLeads,
   };
 }
 
-export async function getSearchHistory() {
-  return SearchHistory.find().sort({ searchedAt: -1 }).limit(50);
+export async function getSearchHistory(userEmail: string) {
+  return SearchHistory.find({ userEmail }).sort({ searchedAt: -1 }).limit(50);
+}
+
+export async function autocompleteCities(input: string): Promise<
+  Array<{ description: string; placeId: string }>
+> {
+  if (!input || input.length < 1) return [];
+
+  const accessToken = await getAccessToken();
+
+  const res = await fetch(
+    `${PLACES_BASE}/places:autocomplete`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        input,
+        includedPrimaryTypes: ["locality", "sublocality", "administrative_area_level_1", "administrative_area_level_2"],
+        includedRegionCodes: [],
+        languageCode: "en",
+      }),
+    }
+  );
+
+  if (!res.ok) return [];
+
+  const data = await res.json() as {
+    suggestions?: Array<{
+      placePrediction?: {
+        text?: { text: string };
+        placeId?: string;
+      };
+    }>;
+  };
+
+  return (data.suggestions || [])
+    .filter((s) => s.placePrediction?.text?.text)
+    .map((s) => ({
+      description: s.placePrediction!.text!.text,
+      placeId: s.placePrediction!.placeId || "",
+    }));
 }

@@ -1,6 +1,5 @@
 import { create } from "zustand";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+import { apiFetch } from "../lib/api";
 
 interface Review {
   author: string;
@@ -95,15 +94,12 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
 
   fetchLeads: async (params) => {
     set({ loading: true, error: null });
-    const token = localStorage.getItem("token");
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== "") query.set(k, String(v));
     });
     try {
-      const res = await fetch(`${API_URL}/leads?${query}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/leads?${query}`);
       const data = await res.json();
       if (!res.ok) {
         set({ loading: false, error: data.message || "Failed to fetch leads" });
@@ -123,11 +119,8 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
 
   fetchLeadDetail: async (id) => {
     set({ detailLoading: true });
-    const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_URL}/leads/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/leads/${id}`);
       const data = await res.json();
       if (!res.ok) {
         set({ detailLoading: false });
@@ -140,14 +133,9 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
   },
 
   updateLeadStatus: async (id, status) => {
-    const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_URL}/leads/${id}/status`, {
+      const res = await apiFetch(`/leads/${id}/status`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ status }),
       });
       const data = await res.json();
@@ -167,11 +155,9 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
   },
 
   deleteLead: async (id) => {
-    const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_URL}/leads/${id}`, {
+      const res = await apiFetch(`/leads/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
       const { leads, total } = get();
@@ -186,11 +172,8 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
 
   fetchDashboardStats: async () => {
     set({ statsLoading: true });
-    const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`${API_URL}/leads/stats`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/leads/stats`);
       const data = await res.json();
       if (!res.ok) {
         set({ statsLoading: false });

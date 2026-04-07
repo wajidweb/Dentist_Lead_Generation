@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface ISearchHistory extends Document {
+  userEmail: string;
   query: string;
   location: string;
   minRating: number;
@@ -11,6 +12,7 @@ export interface ISearchHistory extends Document {
 }
 
 const searchHistorySchema = new Schema<ISearchHistory>({
+  userEmail: { type: String, required: true, index: true },
   query: { type: String, required: true },
   location: { type: String, required: true },
   minRating: { type: Number, default: 3.5 },
