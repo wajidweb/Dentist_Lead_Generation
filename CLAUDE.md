@@ -174,11 +174,17 @@ When adding a new feature:
 
 ## Colors
 
-- Primary accent: `#d1ff8f`
-- Background (login/404): `#dfefdb`
-- Background (dashboard content): `#f7faf5`
-- Text: gray-900, gray-500, black
-- Cards/Sidebar: white with gray-100 borders
+- Theme: Emerald + warm cream (sophisticated light)
+- Primary (dark green): `#2A4A3A` — buttons, logo, sidebar bg
+- Emerald (accent): `#3D8B5E` — active states, focus rings, badges
+- Page bg: `#F5F1EB` (warm cream)
+- Card bg: `white` with `#E8E2D8` borders
+- Sidebar: `#1E3A2E` dark forest green, active item `#3D8B5E`, text `#7BAF8E`
+- Input fields: `#FAF8F5` bg, `#DDD8D0` borders, emerald focus ring
+- Text: `#1A2E22` (primary), `#5A6B60` (secondary), `#8A9590` (muted), `#B5AFA5` (faint)
+- Buttons: `#2A4A3A` bg with white text (primary), `#3D8B5E` bg with white text (accent)
+- Alert: `#C75555`, Warm: `#C47A4A`, Amber: `#B89A4A`
+- Pipeline gradient: `#A8D4B8` → `#7BC095` → `#3D8B5E` → `#2D7A4E` → `#1E6B3E` → `#155030`
 
 ## General
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Key, Mail, Search, User } from "lucide-react";
 
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
@@ -14,11 +15,7 @@ export default function SettingsPage() {
     {
       title: "API Keys",
       description: "Configure external service credentials",
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
-        </svg>
-      ),
+      icon: <Key size={18} />,
       fields: [
         { label: "Google Places API Key", key: "GOOGLE_PLACES_API_KEY", placeholder: "AIzaSy...", type: "password" },
         { label: "Anthropic (Claude) API Key", key: "ANTHROPIC_API_KEY", placeholder: "sk-ant-api03-...", type: "password" },
@@ -29,12 +26,7 @@ export default function SettingsPage() {
     {
       title: "Email Outreach",
       description: "Configure cold email settings",
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="2" y="4" width="20" height="16" rx="2" />
-          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-        </svg>
-      ),
+      icon: <Mail size={18} />,
       fields: [
         { label: "Instantly.ai API Key", key: "INSTANTLY_API_KEY", placeholder: "Your Instantly key", type: "password" },
         { label: "Your Name", key: "SENDER_NAME", placeholder: "John Smith", type: "text" },
@@ -45,12 +37,7 @@ export default function SettingsPage() {
     {
       title: "Search Defaults",
       description: "Default filters for dentist searches",
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-      ),
+      icon: <Search size={18} />,
       fields: [
         { label: "Default Min Rating", key: "DEFAULT_MIN_RATING", placeholder: "3.5", type: "text" },
         { label: "Default Min Reviews", key: "DEFAULT_MIN_REVIEWS", placeholder: "10", type: "text" },
@@ -65,10 +52,10 @@ export default function SettingsPage() {
       <div
         className={`mb-8 transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
       >
-        <h1 className="text-2xl sm:text-[28px] font-semibold text-gray-900 tracking-tight">
+        <h1 className="text-2xl sm:text-[28px] font-semibold text-[#1A2E22] tracking-tight">
           Settings
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-[#8A9590] mt-1">
           Configure your platform and API credentials
         </p>
       </div>
@@ -78,17 +65,17 @@ export default function SettingsPage() {
         {sections.map((section, sIdx) => (
           <div
             key={section.title}
-            className={`bg-white rounded-xs border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
+            className={`bg-white rounded-xs border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
             style={{ transitionDelay: `${75 + sIdx * 75}ms` }}
           >
             {/* Section Header */}
-            <div className="px-6 py-4 border-b border-gray-50 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xs bg-[#d1ff8f]/20 flex items-center justify-center text-gray-600">
+            <div className="px-6 py-4 border-b border-[#EDE8E0] flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xs bg-[#3D8B5E]/10 flex items-center justify-center text-[#5A6B60]">
                 {section.icon}
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-gray-900">{section.title}</h2>
-                <p className="text-xs text-gray-400">{section.description}</p>
+                <h2 className="text-sm font-semibold text-[#1A2E22]">{section.title}</h2>
+                <p className="text-xs text-[#8A9590]">{section.description}</p>
               </div>
             </div>
 
@@ -96,13 +83,13 @@ export default function SettingsPage() {
             <div className="p-6 space-y-4">
               {section.fields.map((field) => (
                 <div key={field.key}>
-                  <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">
+                  <label className="block text-[11px] font-medium text-[#8A9590] uppercase tracking-wider mb-1.5">
                     {field.label}
                   </label>
                   <input
                     type={field.type}
                     placeholder={field.placeholder}
-                    className="w-full border border-gray-200 rounded-xs px-3 py-2.5 text-sm text-black placeholder-gray-400 focus:outline-none focus:border-[#d1ff8f] focus:ring-2 focus:ring-[#d1ff8f]/30 bg-gray-50/50 focus:bg-white transition-all"
+                    className="w-full border border-[#DDD8D0] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] placeholder-[#B5AFA5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/30 bg-[#FAF8F5] focus:bg-white transition-all"
                   />
                 </div>
               ))}
@@ -112,36 +99,33 @@ export default function SettingsPage() {
 
         {/* Admin Info */}
         <div
-          className={`bg-white rounded-xs border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
+          className={`bg-white rounded-xs border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
           style={{ transitionDelay: "300ms" }}
         >
-          <div className="px-6 py-4 border-b border-gray-50 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xs bg-gray-50 flex items-center justify-center text-gray-400">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+          <div className="px-6 py-4 border-b border-[#EDE8E0] flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xs bg-[#FAF8F5] flex items-center justify-center text-[#8A9590]">
+              <User size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-gray-900">Account</h2>
-              <p className="text-xs text-gray-400">Admin credentials are set via environment variables</p>
+              <h2 className="text-sm font-semibold text-[#1A2E22]">Account</h2>
+              <p className="text-xs text-[#8A9590]">Admin credentials are set via environment variables</p>
             </div>
           </div>
           <div className="p-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-600">Admin Email</span>
-                <span className="text-sm text-gray-900 font-medium">Set in .env</span>
+                <span className="text-sm text-[#5A6B60]">Admin Email</span>
+                <span className="text-sm text-[#1A2E22] font-medium">Set in .env</span>
               </div>
-              <div className="border-t border-gray-50" />
+              <div className="border-t border-[#EDE8E0]" />
               <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-600">JWT Expiry</span>
-                <span className="text-sm text-gray-900 font-medium">7 days</span>
+                <span className="text-sm text-[#5A6B60]">JWT Expiry</span>
+                <span className="text-sm text-[#1A2E22] font-medium">7 days</span>
               </div>
-              <div className="border-t border-gray-50" />
+              <div className="border-t border-[#EDE8E0]" />
               <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-600">Platform Version</span>
-                <span className="text-sm text-gray-900 font-medium tabular-nums">1.0.0</span>
+                <span className="text-sm text-[#5A6B60]">Platform Version</span>
+                <span className="text-sm text-[#1A2E22] font-medium tabular-nums">1.0.0</span>
               </div>
             </div>
           </div>
@@ -153,8 +137,8 @@ export default function SettingsPage() {
           style={{ transitionDelay: "375ms" }}
         >
           <button
-            className="px-6 py-2.5 rounded-xs font-semibold text-black text-sm transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
-            style={{ backgroundColor: "#d1ff8f" }}
+            className="px-6 py-2.5 rounded-xs font-semibold text-white text-sm transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
+            style={{ backgroundColor: "#2A4A3A" }}
           >
             Save Settings
           </button>
