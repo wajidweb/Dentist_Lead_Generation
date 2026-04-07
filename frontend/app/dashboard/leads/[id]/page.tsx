@@ -2,25 +2,45 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import { useLeadsStore } from "../../../store/leadsStore";
-import { ChevronLeft, MapPin, Star, Check, ExternalLink, Phone, User } from "lucide-react";
+import {
+  ChevronLeft,
+  MapPin,
+  Star,
+  Check,
+  ExternalLink,
+  Phone,
+  Globe,
+  Mail,
+  Copy,
+  Calendar,
+  Hash,
+  TrendingUp,
+  MessageSquare,
+  AlertCircle,
+  Zap,
+} from "lucide-react";
 
-const statusColors: Record<string, string> = {
-  discovered: "bg-[#F5F1EB] text-[#5A6B60] border-[#DDD8D0]",
-  analyzed: "bg-[#EDE8E0] text-[#5A6B60] border-[#DDD8D0]",
-  qualified: "bg-[#3D8B5E]/10 text-[#2D7A4E] border-[#3D8B5E]/20",
-  website_created: "bg-[#3D8B5E]/15 text-[#2D7A4E] border-[#3D8B5E]/25",
-  email_sent: "bg-[#3D8B5E]/20 text-[#1A2E22] border-[#3D8B5E]/30",
-  replied: "bg-[#3D8B5E]/40 text-[#1A2E22] border-[#3D8B5E]/50",
-  converted: "bg-[#3D8B5E] text-white border-[#2D7A4E]",
-  lost: "bg-red-50 text-[#C75555] border-red-100",
-  skipped: "bg-[#F5F1EB] text-[#8A9590] border-[#DDD8D0]",
-};
+const pipelineSteps = [
+  { key: "discovered", label: "Discovered", color: "#8A9590" },
+  { key: "analyzed", label: "Analyzed", color: "#5A6B60" },
+  { key: "qualified", label: "Qualified", color: "#3D8B5E" },
+  { key: "website_created", label: "Website Created", color: "#3D8B5E" },
+  { key: "email_sent", label: "Email Sent", color: "#2D7A4E" },
+  { key: "replied", label: "Replied", color: "#C47A4A" },
+  { key: "converted", label: "Converted", color: "#1E6B3E" },
+];
 
 const allStatuses = [
   "discovered", "analyzed", "qualified", "website_created",
   "email_sent", "replied", "converted", "lost", "skipped",
 ];
+
+function copyToClipboard(text: string, label: string) {
+  navigator.clipboard.writeText(text);
+  toast.success(`${label} copied`);
+}
 
 export default function LeadDetailPage() {
   const params = useParams();
@@ -41,18 +61,31 @@ export default function LeadDetailPage() {
 
   const handleStatusChange = (newStatus: string) => {
     updateLeadStatus(id, newStatus);
+    toast.success(`Status updated to ${newStatus.replace("_", " ")}`);
   };
+
+  const currentStepIndex = lead ? allStatuses.indexOf(lead.status) : 0;
 
   if (detailLoading || !lead) {
     return (
-      <div className="max-w-[1400px] mx-auto">
+      <div className="max-w-[1200px] mx-auto">
         <div className="animate-pulse space-y-4">
-          <div className="w-32 h-4 bg-[#E8E2D8] rounded-xs" />
-          <div className="w-64 h-8 bg-[#E8E2D8] rounded-xs" />
-          <div className="w-96 h-4 bg-[#FAF8F5] rounded-xs" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
-            <div className="lg:col-span-2 h-64 bg-[#FAF8F5] rounded-xs" />
-            <div className="h-64 bg-[#FAF8F5] rounded-xs" />
+          <div className="w-24 h-4 bg-[#E8E2D8] rounded-xs" />
+          <div className="bg-white rounded-xs border border-[#D8D2C8] p-6 space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-[#E8E2D8] rounded-xs" />
+              <div className="flex-1 space-y-2">
+                <div className="w-72 h-6 bg-[#E8E2D8] rounded-xs" />
+                <div className="w-48 h-4 bg-[#F5F1EB] rounded-xs" />
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              {[1, 2, 3, 4].map((i) => <div key={i} className="h-16 bg-[#F5F1EB] rounded-xs" />)}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 h-80 bg-[#F5F1EB] rounded-xs" />
+            <div className="h-80 bg-[#F5F1EB] rounded-xs" />
           </div>
         </div>
       </div>
@@ -60,123 +93,236 @@ export default function LeadDetailPage() {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto">
-      {/* Header */}
-      <div
-        className={`mb-6 transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
+    <div className="max-w-[1200px] mx-auto">
+      {/* Back Button */}
+      <button
+        onClick={() => router.back()}
+        className={`text-xs font-medium text-[#6B7570] hover:text-[#1A2E22] mb-4 inline-flex items-center gap-1.5 transition group ${mounted ? "opacity-100" : "opacity-0"}`}
       >
-        <button
-          onClick={() => router.back()}
-          className="text-xs font-medium text-[#8A9590] hover:text-[#1A2E22] mb-4 inline-flex items-center gap-1.5 transition group"
-        >
-          <ChevronLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
-          Back to Leads
-        </button>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xs bg-[#3D8B5E]/10 flex items-center justify-center text-[#5A6B60] shrink-0">
-                <MapPin size={18} />
+        <ChevronLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+        Back to Leads
+      </button>
+
+      {/* Hero Card */}
+      <div
+        className={`bg-white rounded-xs border border-[#D8D2C8] shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden mb-4 transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
+      >
+        {/* Top accent bar */}
+        <div className="h-1 bg-gradient-to-r from-[#3D8B5E] via-[#2D7A4E] to-[#1E6B3E]" />
+
+        <div className="p-5 sm:p-6">
+          {/* Business name + status */}
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xs bg-[#3D8B5E]/10 flex items-center justify-center text-[#3D8B5E] shrink-0">
+                <MapPin size={22} />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-semibold text-[#1A2E22] tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-bold text-[#1A2E22] tracking-tight">
                   {lead.businessName}
                 </h1>
-                <p className="text-sm text-[#8A9590] mt-0.5">{lead.address}</p>
+                <p className="text-sm text-[#6B7570] mt-0.5">{lead.address}</p>
               </div>
             </div>
+            {lead.leadCategory && (
+              <span className={`px-2.5 py-1 rounded-xs text-[11px] font-bold uppercase tracking-wider shrink-0 ${
+                lead.leadCategory === "hot" ? "bg-[#C75555]/10 text-[#C75555]" :
+                lead.leadCategory === "warm" ? "bg-[#C47A4A]/10 text-[#C47A4A]" :
+                lead.leadCategory === "cool" ? "bg-[#3D8B5E]/10 text-[#3D8B5E]" :
+                "bg-[#F5F1EB] text-[#6B7570]"
+              }`}>
+                {lead.leadCategory}
+                {lead.leadScore !== undefined && <span className="ml-1">{lead.leadScore}</span>}
+              </span>
+            )}
           </div>
-          <span
-            className={`inline-flex items-center px-2.5 py-1 rounded-xs text-[11px] font-medium border shrink-0 ${statusColors[lead.status] || "bg-[#FAF8F5] text-[#8A9590]"}`}
-          >
-            {lead.status.replace("_", " ")}
-          </span>
+
+          {/* Quick stats grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-[#F5F1EB] rounded-xs px-4 py-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Star size={12} fill="#facc15" stroke="#facc15" />
+                <span className="text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Rating</span>
+              </div>
+              <span className="text-xl font-bold text-[#1A2E22] tabular-nums">{lead.googleRating}</span>
+            </div>
+            <div className="bg-[#F5F1EB] rounded-xs px-4 py-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <MessageSquare size={12} className="text-[#6B7570]" />
+                <span className="text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Reviews</span>
+              </div>
+              <span className="text-xl font-bold text-[#1A2E22] tabular-nums">{lead.googleReviewCount.toLocaleString()}</span>
+            </div>
+            <div className="bg-[#F5F1EB] rounded-xs px-4 py-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Phone size={12} className="text-[#6B7570]" />
+                <span className="text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Phone</span>
+              </div>
+              {lead.phone ? (
+                <button
+                  onClick={() => copyToClipboard(lead.phone, "Phone")}
+                  className="text-sm font-semibold text-[#1A2E22] hover:text-[#3D8B5E] transition flex items-center gap-1.5 group"
+                >
+                  {lead.phone}
+                  <Copy size={11} className="opacity-0 group-hover:opacity-100 transition" />
+                </button>
+              ) : (
+                <span className="text-sm text-[#8A9590]">N/A</span>
+              )}
+            </div>
+            <div className="bg-[#F5F1EB] rounded-xs px-4 py-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <MapPin size={12} className="text-[#6B7570]" />
+                <span className="text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">City</span>
+              </div>
+              <span className="text-sm font-semibold text-[#1A2E22]">{lead.city}{lead.state ? `, ${lead.state}` : ""}</span>
+            </div>
+          </div>
+
+          {/* Contact row */}
+          {(lead.email || lead.website) && (
+            <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-[#EDE8E0]">
+              {lead.email && (
+                <button
+                  onClick={() => copyToClipboard(lead.email!, "Email")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xs text-xs font-medium text-[#3D5347] bg-[#3D8B5E]/8 hover:bg-[#3D8B5E]/15 transition group"
+                >
+                  <Mail size={13} />
+                  {lead.email}
+                  <Copy size={10} className="opacity-0 group-hover:opacity-100 transition" />
+                </button>
+              )}
+              {lead.website && (
+                <a
+                  href={lead.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xs text-xs font-medium text-[#3D5347] bg-[#F5F1EB] hover:bg-[#EDE8E0] transition"
+                >
+                  <Globe size={13} />
+                  {lead.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
+                  <ExternalLink size={10} />
+                </a>
+              )}
+              {lead.googleMapsUrl && (
+                <a
+                  href={lead.googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xs text-xs font-medium text-[#3D5347] bg-[#F5F1EB] hover:bg-[#EDE8E0] transition"
+                >
+                  <MapPin size={13} />
+                  Google Maps
+                  <ExternalLink size={10} />
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Main Content */}
         <div
-          className={`lg:col-span-2 space-y-4 transition-all duration-500 delay-75 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
+          className={`lg:col-span-2 space-y-4 transition-all duration-500 delay-100 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
         >
-          {/* Stats Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: "Rating", value: lead.googleRating, suffix: "", icon: "star" },
-              { label: "Reviews", value: lead.googleReviewCount, suffix: "", icon: "chat" },
-              { label: "Phone", value: lead.phone || "N/A", suffix: "", icon: "phone" },
-              { label: "City", value: `${lead.city}${lead.state ? `, ${lead.state}` : ""}`, suffix: "", icon: "map" },
-            ].map((stat) => (
-              <div key={stat.label} className="bg-white rounded-xs p-4 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                <div className="text-[11px] font-medium text-[#8A9590] uppercase tracking-wider mb-1.5">
-                  {stat.label}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {stat.icon === "star" && (
-                    <Star size={14} fill="#facc15" stroke="#facc15" strokeWidth={1} />
-                  )}
-                  <span className={`font-semibold text-[#1A2E22] ${typeof stat.value === "number" ? "text-lg tabular-nums" : "text-sm"}`}>
-                    {stat.value}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Links Card */}
-          <div className="bg-white rounded-xs p-5 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h2 className="text-sm font-semibold text-[#1A2E22] mb-3">Details</h2>
-            <div className="space-y-2.5">
-              {[
-                { label: "Website", value: lead.website, href: lead.website },
-                { label: "Maps", value: "View on Google Maps", href: lead.googleMapsUrl },
-                lead.email ? { label: "Email", value: `${lead.email}${lead.emailSource ? ` (via ${lead.emailSource})` : ""}`, href: `mailto:${lead.email}` } : null,
-              ]
-                .filter(Boolean)
-                .map((item) => (
-                  <div key={item!.label} className="flex items-center gap-3">
-                    <span className="text-[11px] font-medium text-[#8A9590] uppercase tracking-wider w-14 shrink-0">
-                      {item!.label}
-                    </span>
-                    <a
-                      href={item!.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-[#5A6B60] hover:text-[#1A2E22] truncate transition"
-                    >
-                      {item!.value}
-                    </a>
-                  </div>
+          {/* Pipeline Progress */}
+          <div className="bg-white rounded-xs p-5 border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-[#1A2E22]">Pipeline Progress</h2>
+              <select
+                value={lead.status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="border border-[#CCC7BE] rounded-xs px-2.5 py-1.5 text-xs text-[#1A2E22] font-medium bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 transition-all"
+              >
+                {allStatuses.map((s) => (
+                  <option key={s} value={s}>
+                    {s.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </option>
                 ))}
+              </select>
+            </div>
+
+            {/* Progress bar */}
+            <div className="flex items-center gap-1 mb-3">
+              {pipelineSteps.map((step, idx) => {
+                const isCurrent = lead.status === step.key;
+                const isPast = currentStepIndex > idx;
+                return (
+                  <div
+                    key={step.key}
+                    className="flex-1 h-2 rounded-full transition-all duration-500"
+                    style={{
+                      backgroundColor: isPast || isCurrent ? step.color : "#EDE8E0",
+                      opacity: isCurrent ? 1 : isPast ? 0.6 : 0.3,
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Step labels */}
+            <div className="flex items-center gap-1">
+              {pipelineSteps.map((step, idx) => {
+                const isCurrent = lead.status === step.key;
+                const isPast = currentStepIndex > idx;
+                return (
+                  <button
+                    key={step.key}
+                    onClick={() => handleStatusChange(step.key)}
+                    className={`flex-1 text-center py-2 rounded-xs text-[10px] font-medium transition-all ${
+                      isCurrent
+                        ? "bg-[#3D8B5E] text-white"
+                        : isPast
+                        ? "bg-[#3D8B5E]/10 text-[#2D7A4E] hover:bg-[#3D8B5E]/20"
+                        : "text-[#8A9590] hover:bg-[#F5F1EB]"
+                    }`}
+                  >
+                    {isCurrent && <span className="mr-1">●</span>}
+                    {isPast && <Check size={10} className="inline mr-0.5" strokeWidth={3} />}
+                    <span className="hidden sm:inline">{step.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Reviews */}
           {lead.reviews && lead.reviews.length > 0 && (
-            <div className="bg-white rounded-xs p-5 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-[#1A2E22]">
-                  Google Reviews
-                </h2>
-                <span className="text-xs text-[#8A9590] tabular-nums">{lead.reviews.length} reviews</span>
+            <div className="bg-white rounded-xs border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+              <div className="px-5 py-4 border-b border-[#EDE8E0] flex items-center justify-between">
+                <h2 className="text-sm font-bold text-[#1A2E22]">Google Reviews</h2>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-0.5">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} size={12} fill={i < Math.round(lead.googleRating) ? "#facc15" : "#E8E2D8"} stroke={i < Math.round(lead.googleRating) ? "#facc15" : "#E8E2D8"} strokeWidth={1} />
+                    ))}
+                  </div>
+                  <span className="text-xs text-[#6B7570] tabular-nums">{lead.reviews.length} reviews</span>
+                </div>
               </div>
-              <div className="space-y-4">
+              <div className="divide-y divide-[#EDE8E0]">
                 {lead.reviews.map((review, idx) => (
-                  <div key={idx} className={idx < lead.reviews.length - 1 ? "pb-4 border-b border-[#EDE8E0]" : ""}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium text-[#1A2E22]">{review.author}</span>
+                  <div key={idx} className="px-5 py-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-[#3D8B5E]/10 flex items-center justify-center text-[#3D8B5E] text-xs font-bold">
+                          {review.author.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <span className="text-sm font-semibold text-[#1A2E22]">{review.author}</span>
+                          {review.relativeTime && (
+                            <span className="text-[11px] text-[#8A9590] ml-2">{review.relativeTime}</span>
+                          )}
+                        </div>
+                      </div>
                       <div className="flex items-center gap-0.5">
                         {Array.from({ length: 5 }).map((_, i) => (
-                          i < review.rating
-                            ? <Star key={i} size={11} fill="#facc15" stroke="#facc15" strokeWidth={1} />
-                            : <Star key={i} size={11} fill="#e5e7eb" stroke="#e5e7eb" strokeWidth={1} />
+                          <Star key={i} size={11} fill={i < review.rating ? "#facc15" : "#E8E2D8"} stroke={i < review.rating ? "#facc15" : "#E8E2D8"} strokeWidth={1} />
                         ))}
                       </div>
                     </div>
-                    <p className="text-sm text-[#5A6B60] leading-relaxed">{review.text}</p>
-                    {review.relativeTime && (
-                      <p className="text-xs text-[#8A9590] mt-1.5">{review.relativeTime}</p>
-                    )}
+                    <p className="text-[13px] text-[#3D5347] leading-relaxed">{review.text}</p>
                   </div>
                 ))}
               </div>
@@ -184,127 +330,116 @@ export default function LeadDetailPage() {
           )}
 
           {/* Website Analysis */}
-          <div className="bg-white rounded-xs p-5 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h2 className="text-sm font-semibold text-[#1A2E22] mb-2">Website Analysis</h2>
-            {lead.websiteAnalysis ? (
-              <>
+          {lead.websiteAnalysis && (
+            <div className="bg-white rounded-xs border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+              <div className="px-5 py-4 border-b border-[#EDE8E0] flex items-center justify-between">
+                <h2 className="text-sm font-bold text-[#1A2E22]">Website Analysis</h2>
+                <span className="text-xs font-semibold text-[#3D8B5E] tabular-nums">{lead.websiteAnalysis.overallScore}/100</span>
+              </div>
+              <div className="p-5">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                   {[
-                    { label: "Overall", value: `${lead.websiteAnalysis.overallScore}/100` },
-                    { label: "Performance", value: lead.websiteAnalysis.performanceScore },
-                    { label: "SEO", value: lead.websiteAnalysis.seoScore },
-                    { label: "Visual", value: `${lead.websiteAnalysis.visualScore}/10` },
+                    { label: "Performance", value: lead.websiteAnalysis.performanceScore, icon: <Zap size={13} /> },
+                    { label: "SEO", value: lead.websiteAnalysis.seoScore, icon: <TrendingUp size={13} /> },
+                    { label: "Visual", value: `${lead.websiteAnalysis.visualScore}/10`, icon: <Globe size={13} /> },
+                    { label: "Content", value: lead.websiteAnalysis.contentScore, icon: <MessageSquare size={13} /> },
                   ].map((s) => (
-                    <div key={s.label} className="bg-[#FAF8F5] rounded-xs p-3 text-center">
-                      <div className="text-[10px] font-medium text-[#8A9590] uppercase tracking-wider mb-1">{s.label}</div>
-                      <div className="text-lg font-semibold text-[#1A2E22] tabular-nums">{s.value}</div>
+                    <div key={s.label} className="bg-[#F5F1EB] rounded-xs p-3">
+                      <div className="flex items-center gap-1.5 mb-1.5 text-[#6B7570]">
+                        {s.icon}
+                        <span className="text-[10px] font-semibold uppercase tracking-wider">{s.label}</span>
+                      </div>
+                      <div className="text-lg font-bold text-[#1A2E22] tabular-nums">{s.value}</div>
                     </div>
                   ))}
                 </div>
                 {lead.websiteAnalysis.issues?.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-medium text-[#8A9590] uppercase tracking-wider mb-2">Issues Found</h3>
+                  <div className="border-t border-[#EDE8E0] pt-4">
+                    <h3 className="text-xs font-semibold text-[#6B7570] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                      <AlertCircle size={12} />
+                      Issues Found ({lead.websiteAnalysis.issues.length})
+                    </h3>
                     <ul className="space-y-1.5">
                       {lead.websiteAnalysis.issues.map((issue, idx) => (
-                        <li key={idx} className="text-sm text-[#5A6B60] flex items-start gap-2">
-                          <span className="text-[#B5AFA5] mt-0.5">&#x2022;</span>
+                        <li key={idx} className="text-[13px] text-[#3D5347] flex items-start gap-2">
+                          <span className="text-[#C47A4A] mt-0.5 shrink-0">●</span>
                           {issue}
                         </li>
                       ))}
                     </ul>
                   </div>
                 )}
-              </>
-            ) : (
-              <p className="text-sm text-[#8A9590]">Not analyzed yet. Analysis will be available in Phase 2.</p>
-            )}
-          </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
         <div
-          className={`space-y-4 transition-all duration-500 delay-150 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
+          className={`space-y-4 transition-all duration-500 delay-200 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
         >
-          {/* Status */}
-          <div className="bg-white rounded-xs p-5 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h2 className="text-sm font-semibold text-[#1A2E22] mb-3">Pipeline</h2>
-            <select
-              value={lead.status}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="w-full border border-[#DDD8D0] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/30 focus:bg-white transition-all mb-3"
-            >
-              {allStatuses.map((s) => (
-                <option key={s} value={s}>
-                  {s.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                </option>
-              ))}
-            </select>
-
-            <div className="space-y-1">
-              {allStatuses.slice(0, -2).map((s) => {
-                const isActive = lead.status === s;
-                const isPast = allStatuses.indexOf(lead.status) > allStatuses.indexOf(s);
-                return (
-                  <div
-                    key={s}
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xs text-xs font-medium transition ${
-                      isActive ? "bg-[#3D8B5E] text-white" : isPast ? "text-[#2D7A4E] bg-[#3D8B5E]/10" : "text-[#8A9590] bg-[#F5F1EB]"
-                    }`}
-                  >
-                    {isPast ? (
-                      <Check size={12} strokeWidth={3} />
-                    ) : isActive ? (
-                      <div className="w-1.5 h-1.5 rounded-xs bg-white" />
-                    ) : (
-                      <div className="w-1.5 h-1.5 rounded-xs bg-[#B5AFA5]" />
-                    )}
-                    {s.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                  </div>
-                );
-              })}
+          {/* Quick Actions */}
+          <div className="bg-white rounded-xs border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-[#EDE8E0]">
+              <h2 className="text-sm font-bold text-[#1A2E22]">Quick Actions</h2>
             </div>
-          </div>
-
-          {/* Actions */}
-          <div className="bg-white rounded-xs p-5 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h2 className="text-sm font-semibold text-[#1A2E22] mb-3">Actions</h2>
-            <div className="space-y-1.5">
+            <div className="p-2">
               {[
-                { label: "Visit Website", href: lead.website, icon: <ExternalLink size={15} /> },
-                lead.googleMapsUrl ? { label: "View on Maps", href: lead.googleMapsUrl, icon: <MapPin size={15} /> } : null,
-                lead.phone ? { label: `Call ${lead.phone}`, href: `tel:${lead.phone}`, icon: <Phone size={15} /> } : null,
+                lead.phone ? { label: lead.phone, icon: <Phone size={15} />, action: () => copyToClipboard(lead.phone, "Phone"), type: "copy" } : null,
+                lead.email ? { label: lead.email, icon: <Mail size={15} />, action: () => copyToClipboard(lead.email!, "Email"), type: "copy" } : null,
+                { label: "Visit Website", icon: <Globe size={15} />, href: lead.website, type: "link" },
+                lead.googleMapsUrl ? { label: "View on Maps", icon: <MapPin size={15} />, href: lead.googleMapsUrl, type: "link" } : null,
               ]
                 .filter(Boolean)
-                .map((action) => (
-                  <a
-                    key={action!.label}
-                    href={action!.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xs text-sm font-medium text-[#5A6B60] hover:bg-[#FAF8F5] border border-[#E8E2D8] transition group"
-                  >
-                    <span className="text-[#8A9590] group-hover:text-[#5A6B60] transition">{action!.icon}</span>
-                    {action!.label}
-                  </a>
-                ))}
+                .map((action) =>
+                  action!.type === "link" ? (
+                    <a
+                      key={action!.label}
+                      href={action!.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xs text-sm text-[#3D5347] hover:bg-[#F5F1EB] transition group"
+                    >
+                      <span className="text-[#6B7570] group-hover:text-[#3D8B5E] transition">{action!.icon}</span>
+                      <span className="truncate">{action!.label}</span>
+                      <ExternalLink size={11} className="ml-auto text-[#8A9590] shrink-0" />
+                    </a>
+                  ) : (
+                    <button
+                      key={action!.label}
+                      onClick={action!.action}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xs text-sm text-[#3D5347] hover:bg-[#F5F1EB] transition group text-left"
+                    >
+                      <span className="text-[#6B7570] group-hover:text-[#3D8B5E] transition">{action!.icon}</span>
+                      <span className="truncate">{action!.label}</span>
+                      <Copy size={11} className="ml-auto text-[#8A9590] opacity-0 group-hover:opacity-100 transition shrink-0" />
+                    </button>
+                  )
+                )}
             </div>
           </div>
 
           {/* Info */}
-          <div className="bg-white rounded-xs p-5 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h2 className="text-sm font-semibold text-[#1A2E22] mb-3">Info</h2>
-            <div className="space-y-2.5">
+          <div className="bg-white rounded-xs border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-[#EDE8E0]">
+              <h2 className="text-sm font-bold text-[#1A2E22]">Lead Info</h2>
+            </div>
+            <div className="p-5 space-y-3">
               {[
-                { label: "Place ID", value: lead.googlePlaceId, mono: true },
-                { label: "Added", value: new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
-                { label: "Updated", value: new Date(lead.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
-                lead.leadScore !== undefined ? { label: "Lead Score", value: lead.leadScore, bold: true } : null,
+                { label: "Added", value: new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), icon: <Calendar size={13} /> },
+                { label: "Updated", value: new Date(lead.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), icon: <Calendar size={13} /> },
+                lead.leadScore !== undefined ? { label: "Lead Score", value: `${lead.leadScore} / 100`, icon: <TrendingUp size={13} /> } : null,
+                lead.emailSource ? { label: "Email Source", value: lead.emailSource, icon: <Mail size={13} /> } : null,
+                { label: "Place ID", value: lead.googlePlaceId, icon: <Hash size={13} />, mono: true },
               ]
                 .filter(Boolean)
                 .map((item) => (
-                  <div key={item!.label} className="flex items-center justify-between">
-                    <span className="text-xs text-[#8A9590]">{item!.label}</span>
-                    <span className={`text-xs text-[#1A2E22] ${item!.mono ? "font-mono truncate max-w-[120px]" : ""} ${item!.bold ? "font-bold" : ""} tabular-nums`}>
+                  <div key={item!.label} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-[#6B7570] shrink-0">
+                      {item!.icon}
+                      <span className="text-xs">{item!.label}</span>
+                    </div>
+                    <span className={`text-xs font-medium text-[#1A2E22] tabular-nums text-right ${item!.mono ? "font-mono truncate max-w-[140px]" : ""}`}>
                       {item!.value}
                     </span>
                   </div>

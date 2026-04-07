@@ -6,6 +6,8 @@ import {
   updateLead,
   deleteLead,
   getDashboardStats,
+  bulkDeleteLeads,
+  bulkUpdateLeadStatus,
 } from "../services/leadsService";
 
 export const list = async (req: Request, res: Response) => {
@@ -14,6 +16,7 @@ export const list = async (req: Request, res: Response) => {
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 20,
       status: req.query.status as string,
+      category: req.query.category as string,
       city: req.query.city as string,
       minLeadScore: req.query.minLeadScore
         ? Number(req.query.minLeadScore)
@@ -120,5 +123,39 @@ export const stats = async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("Dashboard stats error:", error);
     res.status(500).json({ message: "Failed to fetch stats" });
+  }
+};
+
+export const bulkRemove = async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ message: "ids array is required" });
+      return;
+    }
+    const count = await bulkDeleteLeads(ids);
+    res.json({ message: `${count} leads deleted`, count });
+  } catch (error) {
+    console.error("Bulk delete error:", error);
+    res.status(500).json({ message: "Failed to bulk delete leads" });
+  }
+};
+
+export const bulkChangeStatus = async (req: Request, res: Response) => {
+  try {
+    const { ids, status } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ message: "ids array is required" });
+      return;
+    }
+    if (!status) {
+      res.status(400).json({ message: "status is required" });
+      return;
+    }
+    const count = await bulkUpdateLeadStatus(ids, status);
+    res.json({ message: `${count} leads updated`, count });
+  } catch (error) {
+    console.error("Bulk status update error:", error);
+    res.status(500).json({ message: "Failed to bulk update leads" });
   }
 };

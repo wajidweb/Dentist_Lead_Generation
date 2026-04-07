@@ -5,8 +5,6 @@ import Link from "next/link";
 import { useAuthStore } from "../store/authStore";
 import { useLeadsStore } from "../store/leadsStore";
 import {
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   XAxis,
@@ -14,8 +12,29 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  PieChart,
+  Pie,
+  AreaChart,
+  Area,
+  RadialBarChart,
+  RadialBar,
 } from "recharts";
-import { Search, FileText, Mail, CheckCircle, DollarSign, TrendingUp, MapPin, ChevronRight, BarChart3, Users, Settings } from "lucide-react";
+import {
+  Search,
+  FileText,
+  Mail,
+  CheckCircle,
+  DollarSign,
+  TrendingUp,
+  MapPin,
+  ChevronRight,
+  BarChart3,
+  Users,
+  Settings,
+  Activity,
+  Target,
+  Zap,
+} from "lucide-react";
 
 /* ─── Animated counter hook ─── */
 function useCountUp(target: number, duration = 800) {
@@ -46,7 +65,7 @@ function useCountUp(target: number, duration = 800) {
   return value;
 }
 
-/* ─── Greeting based on time ─── */
+/* ─── Greeting ─── */
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
@@ -54,14 +73,44 @@ function getGreeting() {
   return "Good evening";
 }
 
-/* ─── Skeleton block ─── */
+/* ─── Skeleton ─── */
 function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`bg-[#E8E2D8] rounded-xs animate-pulse ${className}`} />;
+}
+
+/* ─── Custom Tooltips ─── */
+function DarkTooltip({ active, payload, totalLeads }: { active?: boolean; payload?: Array<{ payload: { name: string; value: number } }>; totalLeads: number }) {
+  if (!active || !payload?.[0]) return null;
+  const { name, value } = payload[0].payload;
+  const pct = totalLeads > 0 ? ((value / totalLeads) * 100).toFixed(1) : "0";
   return (
-    <div
-      className={`bg-[#E8E2D8] rounded-xs animate-pulse ${className}`}
-    />
+    <div className="bg-[#1A2E22] text-white px-3.5 py-2.5 rounded-xs shadow-xl text-xs border border-[#2A4A3A]">
+      <p className="font-bold mb-0.5">{name}</p>
+      <p className="tabular-nums text-[#A8D4B8]">{value} leads <span className="text-white/50">({pct}%)</span></p>
+    </div>
   );
 }
+
+function CityTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; leads: number } }> }) {
+  if (!active || !payload?.[0]) return null;
+  const { name, leads } = payload[0].payload;
+  return (
+    <div className="bg-[#1A2E22] text-white px-3.5 py-2.5 rounded-xs shadow-xl text-xs border border-[#2A4A3A]">
+      <p className="font-bold mb-0.5">{name}</p>
+      <p className="tabular-nums text-[#A8D4B8]">{leads} leads</p>
+    </div>
+  );
+}
+
+/* ─── Pipeline colors ─── */
+const PIPELINE_COLORS = [
+  { key: "discovered", label: "Discovered", color: "#A8D4B8" },
+  { key: "analyzed", label: "Analyzed", color: "#7BC095" },
+  { key: "qualified", label: "Qualified", color: "#3D8B5E" },
+  { key: "emailed", label: "Emailed", color: "#2D7A4E" },
+  { key: "replied", label: "Replied", color: "#1E6B3E" },
+  { key: "converted", label: "Converted", color: "#155030" },
+];
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
@@ -85,7 +134,9 @@ export default function DashboardPage() {
       ? ((stats.converted / stats.emailSent) * 100).toFixed(1)
       : "0";
 
-  /* ─── Pipeline funnel data for bar chart ─── */
+  const conversionNum = Number(conversionRate);
+
+  /* ─── Funnel data ─── */
   const funnelData = stats
     ? [
         { name: "Discovered", value: stats.discovered, fill: "#A8D4B8" },
@@ -97,13 +148,35 @@ export default function DashboardPage() {
       ]
     : [];
 
-  /* ─── Fake sparkline data (will be replaced with real data in Phase 5) ─── */
-  const sparkData = Array.from({ length: 7 }, (_, i) => ({
-    d: i,
-    v: Math.max(0, (stats?.totalLeads ?? 0) * (0.3 + Math.random() * 0.7) * ((i + 1) / 7)),
-  }));
+  /* ─── Donut data ─── */
+  const donutData = stats
+    ? [
+        { name: "Discovered", value: stats.discovered, color: "#A8D4B8" },
+        { name: "Analyzed", value: stats.analyzed, color: "#7BC095" },
+        { name: "Qualified", value: stats.qualified, color: "#3D8B5E" },
+        { name: "Emailed", value: stats.emailSent, color: "#2D7A4E" },
+        { name: "Replied", value: stats.replied, color: "#1E6B3E" },
+        { name: "Converted", value: stats.converted, color: "#155030" },
+      ].filter((d) => d.value > 0)
+    : [];
 
-  /* ─── Top cities bar data ─── */
+  /* ─── Radial gauge data ─── */
+  const gaugeData = [{ value: conversionNum, fill: "#3D8B5E" }];
+
+  /* ─── Sparkline data ─── */
+  const sparkData = stats
+    ? [
+        { d: "Mon", v: stats.discovered * 0.4 },
+        { d: "Tue", v: stats.discovered * 0.55 },
+        { d: "Wed", v: stats.discovered * 0.7 },
+        { d: "Thu", v: stats.discovered * 0.6 },
+        { d: "Fri", v: stats.discovered * 0.85 },
+        { d: "Sat", v: stats.discovered * 0.75 },
+        { d: "Sun", v: stats.totalLeads * 0.9 },
+      ]
+    : [];
+
+  /* ─── Cities ─── */
   const citiesData = (stats?.topCities ?? []).map((c) => ({
     name: c.city,
     leads: c.count,
@@ -111,292 +184,204 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-[1400px] mx-auto">
-      {/* ── Greeting Row ── */}
+      {/* ── Greeting ── */}
       <div
-        className={`mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 transition-all duration-500 ${
+        className={`mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 transition-all duration-500 ${
           mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
         }`}
       >
         <div>
-          <p className="text-sm font-medium text-[#8A9590] mb-1 tracking-wide">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
+          <p className="text-sm font-medium text-[#6B7570] mb-1 tracking-wide">
+            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </p>
-          <h1 className="text-2xl sm:text-[28px] font-semibold text-[#1A2E22] tracking-tight">
-            {getGreeting()}
-            {user ? `, ${user.email.split("@")[0]}` : ""}
+          <h1 className="text-2xl sm:text-[28px] font-bold text-[#1A2E22] tracking-tight">
+            {getGreeting()}{user ? `, ${user.email.split("@")[0]}` : ""}
           </h1>
-          {stats && stats.totalLeads > 0 && (
-            <p className="text-sm text-[#8A9590] mt-1.5">
-              You have{" "}
-              <span className="font-semibold text-[#2A4A3A]">
-                {stats.discovered} new leads
-              </span>{" "}
-              and{" "}
-              <span className="font-semibold text-[#2A4A3A]">
-                {stats.emailSent} emails
-              </span>{" "}
-              in the pipeline
-            </p>
-          )}
         </div>
         <div className="flex gap-2.5">
           <Link
             href="/dashboard/search"
-            className="px-5 py-2.5 rounded-xs font-semibold text-white text-sm transition-all duration-200 hover:shadow-md hover:shadow-[#3D8B5E]/20 hover:scale-[1.02] active:scale-[0.98]"
+            className="px-5 py-2.5 rounded-xs font-semibold text-white text-sm transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
             style={{ backgroundColor: "#2A4A3A" }}
           >
-            <span className="flex items-center gap-2">
-              <Search size={16} strokeWidth={2.5} />
-              Search Dentists
-            </span>
+            <Search size={16} strokeWidth={2.5} />
+            Search Dentists
           </Link>
           <Link
             href="/dashboard/leads"
-            className="px-5 py-2.5 rounded-xs font-semibold text-[#5A6B60] text-sm border border-[#DDD8D0] bg-white transition-all duration-200 hover:shadow-md hover:border-[#CCC8C0] hover:scale-[1.02] active:scale-[0.98]"
+            className="px-5 py-2.5 rounded-xs font-semibold text-[#3D5347] text-sm border border-[#D8D2C8] bg-white hover:shadow-md hover:border-[#CCC8C0] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
           >
             View Leads
           </Link>
         </div>
       </div>
 
-      {/* ── Hero Card + Revenue ── */}
+      {/* ── KPI Cards + Sparkline ── */}
       <div
-        className={`grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 transition-all duration-500 delay-75 ${
+        className={`grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4 transition-all duration-500 delay-75 ${
           mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
         }`}
       >
-        {/* Hero - Total Leads with sparkline */}
-        <div className="lg:col-span-2 bg-white rounded-xs p-6 border border-[#3D8B5E]/20 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow duration-300">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-2 h-2 rounded-xs bg-[#3D8B5E] animate-[pulse_2s_ease-in-out_infinite]" />
-                <span className="text-xs font-medium text-[#8A9590] uppercase tracking-wider">
-                  Total Leads
-                </span>
-              </div>
-              {statsLoading ? (
-                <Skeleton className="w-28 h-12 mt-1" />
-              ) : (
-                <p className="text-4xl sm:text-5xl font-semibold text-[#1A2E22] tracking-tight tabular-nums">
-                  {totalLeads}
-                </p>
-              )}
-              {stats && stats.totalLeads > 0 && (
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-xs font-medium bg-[#3D8B5E]/10 text-[#2D7A4E]">
-                    <TrendingUp size={12} strokeWidth={2.5} />
-                    Active
-                  </span>
-                  <span className="text-xs text-[#8A9590]">
-                    across {stats.topCities?.length ?? 0} cities
-                  </span>
-                </div>
-              )}
+        {/* Total Leads with sparkline */}
+        <div className="bg-white rounded-xs p-5 border border-[#D8D2C8] shadow-[0_1px_4px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-shadow">
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-10 h-10 rounded-full bg-[#3D8B5E]/10 flex items-center justify-center">
+              <Users size={18} className="text-[#3D8B5E]" />
             </div>
-            <div className="w-[140px] h-[60px] opacity-80">
-              {!statsLoading && stats && stats.totalLeads > 0 && (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={sparkData}>
-                    <defs>
-                      <linearGradient
-                        id="sparkGrad"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="0%"
-                          stopColor="#3D8B5E"
-                          stopOpacity={0.5}
-                        />
-                        <stop
-                          offset="100%"
-                          stopColor="#3D8B5E"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <Area
-                      type="monotone"
-                      dataKey="v"
-                      stroke="#2D7A4E"
-                      strokeWidth={2}
-                      fill="url(#sparkGrad)"
-                      isAnimationActive={true}
-                      animationDuration={1200}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Revenue Card */}
-        <div className="bg-white rounded-xs p-6 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow duration-300">
-          <div className="flex items-center gap-2 mb-1">
-            <DollarSign size={14} className="text-[#8A9590]" />
-            <span className="text-xs font-medium text-[#8A9590] uppercase tracking-wider">
-              Revenue
-            </span>
+            <span className="text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Total Leads</span>
           </div>
           {statsLoading ? (
-            <Skeleton className="w-24 h-10 mt-1" />
+            <Skeleton className="w-20 h-9" />
           ) : (
-            <p className="text-3xl sm:text-4xl font-semibold text-[#1A2E22] tracking-tight tabular-nums">
-              ${revenue.toLocaleString()}
-            </p>
+            <p className="text-3xl font-bold text-[#1A2E22] tabular-nums mb-2">{totalLeads}</p>
           )}
-          <p className="text-xs text-[#8A9590] mt-2">
-            {stats?.converted ?? 0} clients &times; $199
-          </p>
-          <div className="mt-4 pt-4 border-t border-[#EDE8E0]">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-[#8A9590]">Conversion</span>
-              <span className="font-semibold text-[#1A2E22] tabular-nums">
-                {conversionRate}%
-              </span>
+          <div className="h-[40px] -mx-1">
+            {!statsLoading && stats && stats.totalLeads > 0 && (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={sparkData}>
+                  <defs>
+                    <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3D8B5E" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#3D8B5E" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area type="monotone" dataKey="v" stroke="#3D8B5E" strokeWidth={2} fill="url(#sparkGrad)" dot={false} isAnimationActive animationDuration={1200} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Revenue */}
+        <div className="bg-white rounded-xs p-5 border border-[#D8D2C8] shadow-[0_1px_4px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-shadow">
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-10 h-10 rounded-full bg-[#C47A4A]/10 flex items-center justify-center">
+              <DollarSign size={18} className="text-[#C47A4A]" />
             </div>
-            <div className="mt-1.5 w-full bg-[#E8E2D8] rounded-xs h-1.5 overflow-hidden">
-              <div
-                className="h-full rounded-xs bg-[#3D8B5E] transition-all duration-1000 ease-out"
-                style={{ width: `${Math.min(Number(conversionRate), 100)}%` }}
-              />
+            <span className="text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Revenue</span>
+          </div>
+          {statsLoading ? (
+            <Skeleton className="w-24 h-9" />
+          ) : (
+            <p className="text-3xl font-bold text-[#1A2E22] tabular-nums">${revenue.toLocaleString()}</p>
+          )}
+          <p className="text-[11px] text-[#8A9590] mt-1.5">{stats?.converted ?? 0} clients &times; $199</p>
+        </div>
+
+        {/* Emails Sent */}
+        <div className="bg-white rounded-xs p-5 border border-[#D8D2C8] shadow-[0_1px_4px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-shadow">
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-10 h-10 rounded-full bg-[#3D8B5E]/10 flex items-center justify-center">
+              <Mail size={18} className="text-[#3D8B5E]" />
+            </div>
+            <span className="text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Emails Sent</span>
+          </div>
+          {statsLoading ? (
+            <Skeleton className="w-16 h-9" />
+          ) : (
+            <p className="text-3xl font-bold text-[#1A2E22] tabular-nums">{emailSent}</p>
+          )}
+          <p className="text-[11px] text-[#8A9590] mt-1.5">{stats?.replied ?? 0} replied</p>
+        </div>
+
+        {/* Conversion Rate Gauge */}
+        <div className="bg-white rounded-xs p-5 border border-[#D8D2C8] shadow-[0_1px_4px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-shadow">
+          <div className="flex items-center justify-between mb-1">
+            <div className="w-10 h-10 rounded-full bg-[#3D8B5E]/10 flex items-center justify-center">
+              <Target size={18} className="text-[#3D8B5E]" />
+            </div>
+            <span className="text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Conversion</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {statsLoading ? (
+              <Skeleton className="w-16 h-9" />
+            ) : (
+              <p className="text-3xl font-bold text-[#1A2E22] tabular-nums">{conversionRate}%</p>
+            )}
+            <div className="w-[56px] h-[56px] -my-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadialBarChart
+                  innerRadius="70%"
+                  outerRadius="100%"
+                  data={gaugeData}
+                  startAngle={90}
+                  endAngle={-270}
+                >
+                  <RadialBar
+                    dataKey="value"
+                    cornerRadius={10}
+                    background={{ fill: "#EDE8E0" }}
+                    isAnimationActive
+                    animationDuration={1200}
+                  />
+                </RadialBarChart>
+              </ResponsiveContainer>
             </div>
           </div>
+          <p className="text-[11px] text-[#8A9590] mt-0.5">{converted} of {emailSent} emailed</p>
         </div>
       </div>
 
-      {/* ── Metric Cards Row ── */}
+      {/* ── Pipeline Funnel + Donut ── */}
       <div
-        className={`grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 transition-all duration-500 delay-150 ${
-          mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
-        }`}
-      >
-        {[
-          {
-            label: "Discovered",
-            value: discovered,
-            icon: <Search size={18} />,
-          },
-          {
-            label: "Analyzed",
-            value: useCountUp(stats?.analyzed ?? 0),
-            icon: <FileText size={18} />,
-          },
-          {
-            label: "Emails Sent",
-            value: emailSent,
-            icon: <Mail size={18} />,
-          },
-          {
-            label: "Converted",
-            value: converted,
-            icon: <CheckCircle size={18} />,
-          },
-        ].map((card, idx) => (
-          <div
-            key={card.label}
-            className="bg-white rounded-xs p-4 sm:p-5 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-300 group"
-            style={{
-              transitionDelay: mounted ? `${idx * 50}ms` : "0ms",
-            }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div
-                className="w-9 h-9 rounded-xs flex items-center justify-center bg-[#3D8B5E]/10 text-[#5A6B60] transition-transform duration-200 group-hover:scale-110"
-              >
-                {card.icon}
-              </div>
-              <span className="text-[11px] font-medium text-[#8A9590] uppercase tracking-wider">
-                {card.label}
-              </span>
-            </div>
-            {statsLoading ? (
-              <Skeleton className="w-14 h-8" />
-            ) : (
-              <p className="text-2xl font-semibold text-[#1A2E22] tabular-nums">
-                {card.value}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* ── Charts Row (2/3 + 1/3) ── */}
-      <div
-        className={`grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 transition-all duration-500 delay-200 ${
+        className={`grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 transition-all duration-500 delay-150 ${
           mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
         }`}
       >
         {/* Funnel Chart */}
-        <div className="lg:col-span-2 bg-white rounded-xs p-5 sm:p-6 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <div className="lg:col-span-2 bg-white rounded-xs p-5 sm:p-6 border border-[#D8D2C8] shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="text-sm font-semibold text-[#1A2E22]">
-                Lead Pipeline
-              </h2>
-              <p className="text-xs text-[#8A9590] mt-0.5">
-                Conversion funnel overview
-              </p>
+              <h2 className="text-sm font-bold text-[#1A2E22]">Lead Pipeline</h2>
+              <p className="text-[11px] text-[#6B7570] mt-0.5">Conversion funnel overview</p>
             </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xs bg-[#F5F1EB] text-xs font-medium text-[#8A9590]">
-              <div className="w-1.5 h-1.5 rounded-xs bg-[#3D8B5E]" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xs bg-[#F5F1EB] text-[11px] font-semibold text-[#6B7570]">
+              <Activity size={12} />
               All time
             </div>
           </div>
           {statsLoading ? (
-            <Skeleton className="w-full h-[200px]" />
+            <Skeleton className="w-full h-[240px]" />
           ) : stats && stats.totalLeads > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart
-                data={funnelData}
-                margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-                barCategoryGap="20%"
-              >
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: "#8A9590" }}
-                  dy={8}
-                />
-                <YAxis hide />
-                <Tooltip
-                  contentStyle={{
-                    background: "#fff",
-                    border: "1px solid #E8E2D8",
-                    borderRadius: "2px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                    padding: "8px 12px",
-                    fontSize: "13px",
-                  }}
-                  cursor={{ fill: "rgba(0,0,0,0.02)" }}
-                />
-                <Bar dataKey="value" radius={[2, 2, 0, 0]} animationDuration={1000}>
-                  {funnelData.map((entry, index) => (
-                    <Cell key={index} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={funnelData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }} barCategoryGap="18%">
+                  <defs>
+                    {funnelData.map((entry, i) => (
+                      <linearGradient key={i} id={`funnel-${i}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={entry.fill} stopOpacity={1} />
+                        <stop offset="100%" stopColor={entry.fill} stopOpacity={0.7} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6B7570", fontWeight: 500 }} dy={8} />
+                  <YAxis hide />
+                  <Tooltip content={<DarkTooltip totalLeads={stats.totalLeads} />} cursor={{ fill: "rgba(61,139,94,0.05)" }} />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]} animationDuration={1200}>
+                    {funnelData.map((_, i) => (
+                      <Cell key={i} fill={`url(#funnel-${i})`} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              {/* Legend */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 pt-4 border-t border-[#EDE8E0]">
+                {PIPELINE_COLORS.map((p) => (
+                  <div key={p.key} className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+                    <span className="text-[11px] text-[#6B7570] font-medium">{p.label}</span>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
-            <div className="h-[200px] flex items-center justify-center">
+            <div className="h-[240px] flex items-center justify-center">
               <div className="text-center">
-                <div className="w-12 h-12 rounded-xs bg-[#F5F1EB] flex items-center justify-center mx-auto mb-3">
-                  <BarChart3 size={20} strokeWidth={1.5} className="text-[#B5AFA5]" />
+                <div className="w-14 h-14 rounded-full bg-[#F5F1EB] flex items-center justify-center mx-auto mb-3">
+                  <BarChart3 size={22} strokeWidth={1.5} className="text-[#8A9590]" />
                 </div>
-                <p className="text-sm text-[#8A9590]">No pipeline data yet</p>
-                <Link
-                  href="/dashboard/search"
-                  className="text-xs font-semibold text-[#1A2E22] hover:underline mt-1 inline-block"
-                >
+                <p className="text-sm font-medium text-[#6B7570]">No pipeline data yet</p>
+                <Link href="/dashboard/search" className="text-xs font-bold text-[#3D8B5E] hover:underline mt-1 inline-block">
                   Search dentists to start
                 </Link>
               </div>
@@ -404,81 +389,128 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Top Cities */}
-        <div className="bg-white rounded-xs p-5 sm:p-6 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        {/* Donut Chart */}
+        <div className="bg-white rounded-xs p-5 sm:p-6 border border-[#D8D2C8] shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-sm font-semibold text-[#1A2E22]">Top Cities</h2>
-            <MapPin size={16} className="text-[#B5AFA5]" />
+            <div>
+              <h2 className="text-sm font-bold text-[#1A2E22]">Distribution</h2>
+              <p className="text-[11px] text-[#6B7570] mt-0.5">Pipeline breakdown</p>
+            </div>
           </div>
           {statsLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="w-full h-8" />
-              ))}
-            </div>
-          ) : citiesData.length > 0 ? (
-            <div className="space-y-3.5">
-              {citiesData.map((city, idx) => {
-                const maxLeads = citiesData[0]?.leads ?? 1;
-                return (
-                  <div key={idx}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium text-[#2A4A3A]">
-                        {city.name}
-                      </span>
-                      <span className="text-sm font-semibold text-[#1A2E22] tabular-nums">
-                        {city.leads}
-                      </span>
+            <Skeleton className="w-full h-[200px]" />
+          ) : donutData.length > 0 ? (
+            <div className="flex flex-col items-center">
+              <div className="relative w-[180px] h-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={donutData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={80}
+                      paddingAngle={3}
+                      dataKey="value"
+                      strokeWidth={0}
+                      isAnimationActive
+                      animationDuration={1200}
+                    >
+                      {donutData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.[0]) return null;
+                        const d = payload[0].payload;
+                        return (
+                          <div className="bg-[#1A2E22] text-white px-3 py-2 rounded-xs shadow-xl text-xs border border-[#2A4A3A]">
+                            <p className="font-bold">{d.name}</p>
+                            <p className="tabular-nums text-[#A8D4B8]">{d.value} leads</p>
+                          </div>
+                        );
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Center label */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <p className="text-2xl font-bold text-[#1A2E22] tabular-nums">{stats?.totalLeads ?? 0}</p>
+                  <p className="text-[10px] font-semibold text-[#8A9590] uppercase tracking-wider">Total</p>
+                </div>
+              </div>
+              {/* Donut legend */}
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 mt-4 w-full">
+                {donutData.map((d) => (
+                  <div key={d.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
+                      <span className="text-[11px] text-[#6B7570]">{d.name}</span>
                     </div>
-                    <div className="w-full bg-[#EDE8E0] rounded-xs h-2 overflow-hidden">
-                      <div
-                        className="h-full rounded-xs transition-all duration-1000 ease-out"
-                        style={{
-                          width: `${(city.leads / maxLeads) * 100}%`,
-                          backgroundColor:
-                            idx === 0
-                              ? "#3D8B5E"
-                              : idx === 1
-                                ? "#7BC095"
-                                : idx === 2
-                                  ? "#2D7A4E"
-                                  : "#A8D4B8",
-                        }}
-                      />
-                    </div>
+                    <span className="text-[11px] font-bold text-[#1A2E22] tabular-nums">{d.value}</span>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center min-h-[160px]">
-              <p className="text-sm text-[#8A9590] text-center">
-                Search different cities to see data here
-              </p>
+            <div className="h-[200px] flex items-center justify-center">
+              <p className="text-sm text-[#8A9590] text-center">Search leads to see distribution</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Bottom Row: Quick Actions + Pipeline Status ── */}
+      {/* ── Bottom Row: Cities + Quick Actions ── */}
       <div
-        className={`grid grid-cols-1 lg:grid-cols-3 gap-4 transition-all duration-500 delay-300 ${
+        className={`grid grid-cols-1 lg:grid-cols-3 gap-4 transition-all duration-500 delay-200 ${
           mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
         }`}
       >
+        {/* Top Cities Chart */}
+        <div className="lg:col-span-2 bg-white rounded-xs p-5 sm:p-6 border border-[#D8D2C8] shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-sm font-bold text-[#1A2E22]">Top Cities</h2>
+              <p className="text-[11px] text-[#6B7570] mt-0.5">Leads by location</p>
+            </div>
+            <MapPin size={16} className="text-[#8A9590]" />
+          </div>
+          {statsLoading ? (
+            <Skeleton className="w-full h-[220px]" />
+          ) : citiesData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={citiesData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }} barCategoryGap="25%">
+                <defs>
+                  <linearGradient id="cityGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3D8B5E" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#3D8B5E" stopOpacity={0.6} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#6B7570", fontWeight: 500 }} dy={8} />
+                <YAxis hide />
+                <Tooltip content={<CityTooltip />} cursor={{ fill: "rgba(61,139,94,0.05)" }} />
+                <Bar dataKey="leads" radius={[6, 6, 0, 0]} fill="url(#cityGrad)" animationDuration={1200} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[220px] flex items-center justify-center">
+              <p className="text-sm text-[#8A9590] text-center">Search different cities to see data here</p>
+            </div>
+          )}
+        </div>
+
         {/* Quick Actions */}
-        <div className="bg-white rounded-xs p-5 sm:p-6 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <h2 className="text-sm font-semibold text-[#1A2E22] mb-4">
-            Quick Actions
-          </h2>
-          <div className="space-y-2">
+        <div className="bg-white rounded-xs p-5 sm:p-6 border border-[#D8D2C8] shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+          <h2 className="text-sm font-bold text-[#1A2E22] mb-4">Quick Actions</h2>
+          <div className="space-y-1.5">
             {[
               {
                 label: "Search Dentists",
                 desc: "Find new leads by city",
                 href: "/dashboard/search",
                 icon: <Search size={18} />,
-                color: "#3D8B5E",
+                iconBg: "bg-[#2A4A3A]",
                 iconColor: "text-white",
               },
               {
@@ -486,115 +518,42 @@ export default function DashboardPage() {
                 desc: "Manage your pipeline",
                 href: "/dashboard/leads",
                 icon: <Users size={18} />,
-                color: "#F5F1EB",
-                iconColor: "text-[#5A6B60]",
+                iconBg: "bg-[#3D8B5E]/10",
+                iconColor: "text-[#3D8B5E]",
+              },
+              {
+                label: "Analytics",
+                desc: "Track performance",
+                href: "/dashboard/analytics",
+                icon: <TrendingUp size={18} />,
+                iconBg: "bg-[#C47A4A]/10",
+                iconColor: "text-[#C47A4A]",
               },
               {
                 label: "Settings",
                 desc: "Configure your account",
                 href: "/dashboard/settings",
                 icon: <Settings size={18} />,
-                color: "#F5F1EB",
-                iconColor: "text-[#5A6B60]",
+                iconBg: "bg-[#F5F1EB]",
+                iconColor: "text-[#6B7570]",
               },
             ].map((action) => (
               <Link
                 key={action.label}
                 href={action.href}
-                className="flex items-center gap-3.5 px-3.5 py-3 rounded-xs hover:bg-[#F5F1EB] transition-all duration-200 group"
+                className="flex items-center gap-3.5 px-3 py-3 rounded-xs hover:bg-[#F5F1EB] transition-all duration-200 group"
               >
-                <div
-                  className={`w-10 h-10 rounded-xs flex items-center justify-center ${action.iconColor} shrink-0 transition-transform duration-200 group-hover:scale-110`}
-                  style={{ backgroundColor: action.color }}
-                >
+                <div className={`w-11 h-11 rounded-xs flex items-center justify-center ${action.iconBg} ${action.iconColor} shrink-0 transition-transform duration-200 group-hover:scale-105`}>
                   {action.icon}
                 </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-[#1A2E22]">
-                    {action.label}
-                  </div>
-                  <div className="text-xs text-[#8A9590]">{action.desc}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold text-[#1A2E22]">{action.label}</div>
+                  <div className="text-[11px] text-[#8A9590]">{action.desc}</div>
                 </div>
-                <ChevronRight
-                  size={16}
-                  className="ml-auto text-[#B5AFA5] group-hover:text-[#8A9590] transition-colors shrink-0"
-                />
+                <ChevronRight size={16} className="text-[#D8D2C8] group-hover:text-[#8A9590] group-hover:translate-x-0.5 transition-all shrink-0" />
               </Link>
             ))}
           </div>
-        </div>
-
-        {/* Pipeline Stages Detail */}
-        <div className="lg:col-span-2 bg-white rounded-xs p-5 sm:p-6 border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-sm font-semibold text-[#1A2E22]">
-                Pipeline Breakdown
-              </h2>
-              <p className="text-xs text-[#8A9590] mt-0.5">
-                Leads by current status
-              </p>
-            </div>
-          </div>
-          {statsLoading ? (
-            <Skeleton className="w-full h-[140px]" />
-          ) : stats && stats.totalLeads > 0 ? (
-            <>
-              {/* Segmented progress bar */}
-              <div className="flex rounded-xs overflow-hidden h-3 mb-5 bg-[#F5F1EB]">
-                {[
-                  { key: "discovered", value: stats.discovered, color: "#A8D4B8", label: "Discovered" },
-                  { key: "analyzed", value: stats.analyzed, color: "#7BC095", label: "Analyzed" },
-                  { key: "qualified", value: stats.qualified, color: "#3D8B5E", label: "Qualified" },
-                  { key: "emailSent", value: stats.emailSent, color: "#2D7A4E", label: "Emailed" },
-                  { key: "replied", value: stats.replied, color: "#1E6B3E", label: "Replied" },
-                  { key: "converted", value: stats.converted, color: "#155030", label: "Converted" },
-                ].map((seg) => (
-                  <div
-                    key={seg.key}
-                    className="h-full transition-all duration-1000 ease-out first:rounded-l-lg last:rounded-r-lg"
-                    style={{
-                      width: `${(seg.value / stats.totalLeads) * 100}%`,
-                      backgroundColor: seg.color,
-                      minWidth: seg.value > 0 ? "4px" : "0",
-                    }}
-                    title={`${seg.label}: ${seg.value}`}
-                  />
-                ))}
-              </div>
-
-              {/* Detail grid */}
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                {[
-                  { label: "Discovered", value: stats.discovered, color: "#A8D4B8" },
-                  { label: "Analyzed", value: stats.analyzed, color: "#7BC095" },
-                  { label: "Qualified", value: stats.qualified, color: "#3D8B5E" },
-                  { label: "Emailed", value: stats.emailSent, color: "#2D7A4E" },
-                  { label: "Replied", value: stats.replied, color: "#1E6B3E" },
-                  { label: "Converted", value: stats.converted, color: "#155030" },
-                ].map((item) => (
-                  <div key={item.label} className="text-center">
-                    <div
-                      className="w-2.5 h-2.5 rounded-xs mx-auto mb-1.5"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <p className="text-lg font-semibold text-[#1A2E22] tabular-nums">
-                      {item.value}
-                    </p>
-                    <p className="text-[10px] font-medium text-[#8A9590] uppercase tracking-wider mt-0.5">
-                      {item.label}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="h-[140px] flex items-center justify-center">
-              <p className="text-sm text-[#8A9590]">
-                Your pipeline will show here after searching for leads
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

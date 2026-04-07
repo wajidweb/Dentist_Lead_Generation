@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, MapPin, Clock, Star, Check, X, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
 import { useSearchStore } from "../../store/searchStore";
 import CityAutocomplete from "../../components/CityAutocomplete";
 
@@ -29,6 +30,11 @@ export default function SearchPage() {
       minRating: Number(minRating),
       minReviews: Number(minReviews),
       targetLeads: Number(targetLeads),
+    }).then(() => {
+      const { results, error } = useSearchStore.getState();
+      if (results) toast.success(`Found ${results.leadsCreated} leads in ${results.location}`);
+      if (error) toast.error(error);
+      
     });
   };
 
