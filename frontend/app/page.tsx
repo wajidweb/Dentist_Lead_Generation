@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "./store/authStore";
-import { MapPin, Mail, Lock, Loader2 } from "lucide-react";
+import { MapPin, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const { user, loading: authLoading, error: authError, loginAdmin, verifyToken, clearError } = useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -92,7 +93,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    placeholder="admin@gmail.com"
+                    placeholder="Enter your email address"
                     className="w-full border-2 border-[#E8E2D8] rounded-xs pl-11 pr-4 py-3 text-sm text-[#1A2E22] placeholder-[#B5AFA5] focus:outline-none focus:border-[#3D8B5E] bg-[#FAF8F5] focus:bg-white transition-all duration-300"
                   />
                 </div>
@@ -107,13 +108,20 @@ export default function LoginPage() {
                     <Lock size={18} />
                   </span>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     placeholder="Enter your password"
-                    className="w-full border-2 border-[#E8E2D8] rounded-xs pl-11 pr-4 py-3 text-sm text-[#1A2E22] placeholder-[#B5AFA5] focus:outline-none focus:border-[#3D8B5E] bg-[#FAF8F5] focus:bg-white transition-all duration-300"
+                    className="w-full border-2 border-[#E8E2D8] rounded-xs pl-11 pr-11 py-3 text-sm text-[#1A2E22] placeholder-[#B5AFA5] focus:outline-none focus:border-[#3D8B5E] bg-[#FAF8F5] focus:bg-white transition-all duration-300"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8A9590] hover:text-[#5A6B60] transition"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
               </div>
 

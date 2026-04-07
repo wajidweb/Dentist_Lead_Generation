@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, MapPin, Clock, Star, Check, X, Loader2 } from "lucide-react";
 import { useSearchStore } from "../../store/searchStore";
+import CityAutocomplete from "../../components/CityAutocomplete";
 
 export default function SearchPage() {
   const { results, history, loading, historyLoading, error, searchDentists, fetchSearchHistory, clearResults } = useSearchStore();
@@ -11,6 +12,7 @@ export default function SearchPage() {
   const [location, setLocation] = useState("");
   const [minRating, setMinRating] = useState("3.5");
   const [minReviews, setMinReviews] = useState("10");
+  const [targetLeads, setTargetLeads] = useState("20");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -26,6 +28,7 @@ export default function SearchPage() {
       location: location.trim(),
       minRating: Number(minRating),
       minReviews: Number(minReviews),
+      targetLeads: Number(targetLeads),
     });
   };
 
@@ -45,23 +48,13 @@ export default function SearchPage() {
 
       {/* Search Card */}
       <div
-        className={`bg-white rounded-xs border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] mb-6 overflow-hidden transition-all duration-500 delay-75 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
+        className={`bg-white rounded-xs border border-[#E8E2D8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] mb-6 overflow-visible transition-all duration-500 delay-75 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
       >
         <div className="p-6">
           <form onSubmit={handleSearch}>
-            {/* Main search input */}
-            <div className="relative mb-5">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8A9590]">
-                <Search size={20} />
-              </div>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Enter a city... e.g. New York, NY"
-                required
-                className="w-full border border-[#DDD8D0] rounded-xs pl-12 pr-4 py-4 text-[15px] text-[#1A2E22] placeholder-[#B5AFA5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/30 bg-[#FAF8F5] focus:bg-white transition-all"
-              />
+            {/* Main search input with city autocomplete */}
+            <div className="mb-5">
+              <CityAutocomplete value={location} onChange={setLocation} />
             </div>
 
             {/* Filters row */}
@@ -75,26 +68,43 @@ export default function SearchPage() {
                   onChange={(e) => setMinRating(e.target.value)}
                   className="w-full border border-[#DDD8D0] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/30 focus:bg-white transition-all"
                 >
+                  <option value="1.0">1.0+ stars</option>
+                  <option value="1.5">1.5+ stars</option>
+                  <option value="2.0">2.0+ stars</option>
+                  <option value="2.5">2.5+ stars</option>
                   <option value="3.0">3.0+ stars</option>
                   <option value="3.5">3.5+ stars</option>
                   <option value="4.0">4.0+ stars</option>
                   <option value="4.5">4.5+ stars</option>
+                  <option value="5.0">5.0 stars</option>
                 </select>
               </div>
               <div className="flex-1">
                 <label className="block text-[11px] font-medium text-[#8A9590] uppercase tracking-wider mb-1.5">
                   Min Reviews
                 </label>
-                <select
+                <input
+                  type="number"
                   value={minReviews}
                   onChange={(e) => setMinReviews(e.target.value)}
-                  className="w-full border border-[#DDD8D0] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/30 focus:bg-white transition-all"
-                >
-                  <option value="5">5+ reviews</option>
-                  <option value="10">10+ reviews</option>
-                  <option value="20">20+ reviews</option>
-                  <option value="50">50+ reviews</option>
-                </select>
+                  min="0"
+                  placeholder="10"
+                  className="w-full border border-[#DDD8D0] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] placeholder-[#B5AFA5] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/30 focus:bg-white transition-all tabular-nums"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-[11px] font-medium text-[#8A9590] uppercase tracking-wider mb-1.5">
+                  Number of Leads
+                </label>
+                <input
+                  type="number"
+                  value={targetLeads}
+                  onChange={(e) => setTargetLeads(e.target.value)}
+                  min="1"
+                  max="100"
+                  placeholder="20"
+                  className="w-full border border-[#DDD8D0] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/30 focus:bg-white transition-all tabular-nums"
+                />
               </div>
               <div className="flex items-end">
                 <button
@@ -154,27 +164,42 @@ export default function SearchPage() {
                     {results.location}
                   </h2>
                   <p className="text-xs text-[#8A9590] mt-0.5">
-                    {results.totalFromGoogle} found on Google
+                    {results.totalLeadsForLocation} total leads for this city
                   </p>
                 </div>
                 <div className="hidden sm:flex items-center gap-3 ml-4 pl-4 border-l border-[#E8E2D8]">
                   <div className="text-center">
-                    <p className="text-lg font-semibold text-[#1A2E22] tabular-nums">
+                    <p className="text-lg font-semibold text-[#3D8B5E] tabular-nums">
                       {results.leadsCreated}
                     </p>
                     <p className="text-[10px] font-medium text-[#8A9590] uppercase tracking-wider">
-                      Leads Saved
+                      New Leads
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-semibold text-[#C47A4A] tabular-nums">
+                      {results.skippedExisting}
+                    </p>
+                    <p className="text-[10px] font-medium text-[#8A9590] uppercase tracking-wider">
+                      Skipped
                     </p>
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-semibold text-[#1A2E22] tabular-nums">
-                      {results.totalFromGoogle - results.leadsCreated}
+                      {results.pagesSearched}
                     </p>
                     <p className="text-[10px] font-medium text-[#8A9590] uppercase tracking-wider">
-                      Filtered Out
+                      API Calls
                     </p>
                   </div>
                 </div>
+                {results.allExhausted && (
+                  <div className="hidden sm:flex items-center ml-3 pl-3 border-l border-[#E8E2D8]">
+                    <span className="text-[10px] font-medium text-[#C47A4A] bg-[#C47A4A]/10 px-2 py-1 rounded-xs uppercase tracking-wider">
+                      All results found
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Link
