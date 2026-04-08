@@ -27,7 +27,7 @@ async function processJob(job: Job<AnalysisJobData>) {
   await job.updateProgress(10);
   const puppeteerResult = await analyzePage(websiteUrl);
   console.log(
-    `${tag} Step 1/4: Puppeteer done — loadTime=${puppeteerResult.loadTimeMs}ms, https=${puppeteerResult.isHttps}, text=${puppeteerResult.pageText.length} chars, screenshot=${puppeteerResult.desktopScreenshot.length} bytes`
+    `${tag} Step 1/4: Puppeteer done — loadTime=${puppeteerResult.loadTimeMs}ms, https=${puppeteerResult.isHttps}, text=${puppeteerResult.pageText.length} chars, screenshot=${puppeteerResult.desktopScreenshot.length} bytes, emails=${puppeteerResult.emails.length > 0 ? puppeteerResult.emails.join(", ") : "none"}`
   );
 
   // Step 2: Claude — visual + content analysis
@@ -80,7 +80,9 @@ async function processJob(job: Job<AnalysisJobData>) {
   // Save to MongoDB
   console.log(`${tag} Saving to MongoDB...`);
   await job.updateProgress(95);
-  await Lead.findByIdAndUpdate(leadId, {
+
+  // Build update object
+  const updateData: Record<string, unknown> = {
     websiteAnalysis: {
       loadTimeMs: puppeteerResult.loadTimeMs,
       isHttps: puppeteerResult.isHttps,
@@ -110,7 +112,16 @@ async function processJob(job: Job<AnalysisJobData>) {
     analysisStatus: "completed",
     analyzedAt: new Date(),
     status: "analyzed",
-  });
+  };
+
+  // Save scraped email if found and lead doesn't already have one
+  if (puppeteerResult.emails.length > 0 && !lead.email) {
+    updateData.email = puppeteerResult.emails[0]; // Best match (sorted: branded domain first, then info@/office@/contact@)
+    updateData.emailSource = "scrape";
+    console.log(`${tag} Email saved: ${puppeteerResult.emails[0]}`);
+  }
+
+  await Lead.findByIdAndUpdate(leadId, updateData);
 
   // Update group progress
   await AnalysisGroup.findByIdAndUpdate(groupId, {
