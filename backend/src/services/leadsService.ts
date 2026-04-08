@@ -6,6 +6,7 @@ interface LeadFilters {
   status?: string;
   category?: string;
   city?: string;
+  analyzed?: boolean;
   minLeadScore?: number;
   maxLeadScore?: number;
   minWebsiteScore?: number;
@@ -22,6 +23,7 @@ export async function getLeads(filters: LeadFilters) {
     status,
     category,
     city,
+    analyzed,
     minLeadScore,
     maxLeadScore,
     minWebsiteScore,
@@ -37,6 +39,7 @@ export async function getLeads(filters: LeadFilters) {
   if (category) query.leadCategory = category;
   if (city) query.city = { $regex: city, $options: "i" };
   if (search) query.businessName = { $regex: search, $options: "i" };
+  if (analyzed !== undefined) query.analyzed = analyzed;
 
   if (minLeadScore !== undefined || maxLeadScore !== undefined) {
     query.leadScore = {};
@@ -56,16 +59,15 @@ export async function getLeads(filters: LeadFilters) {
         maxWebsiteScore;
   }
 
-  const sortField =
-    sortBy === "leadScore"
-      ? "leadScore"
-      : sortBy === "googleRating"
-        ? "googleRating"
-        : sortBy === "googleReviewCount"
-          ? "googleReviewCount"
-          : sortBy === "websiteScore"
-            ? "websiteAnalysis.overallScore"
-            : "createdAt";
+  const sortFieldMap: Record<string, string> = {
+    leadScore: "leadScore",
+    websiteQualityScore: "websiteQualityScore",
+    googleRating: "googleRating",
+    googleReviewCount: "googleReviewCount",
+    analyzedAt: "analyzedAt",
+    createdAt: "createdAt",
+  };
+  const sortField = sortFieldMap[sortBy] || "createdAt";
 
   const skip = (page - 1) * limit;
   const total = await Lead.countDocuments(query);
@@ -125,35 +127,40 @@ export async function bulkUpdateLeadStatus(ids: string[], status: string) {
   return result.modifiedCount;
 }
 
-export async function getDashboardStats() {
-  const [
-    totalLeads,
-    discovered,
-    analyzed,
-    qualified,
-    emailSent,
-    replied,
-    converted,
-    lost,
-  ] = await Promise.all([
-    Lead.countDocuments(),
-    Lead.countDocuments({ status: "discovered" }),
-    Lead.countDocuments({ status: "analyzed" }),
-    Lead.countDocuments({ status: "qualified" }),
-    Lead.countDocuments({ status: "email_sent" }),
-    Lead.countDocuments({ status: "replied" }),
-    Lead.countDocuments({ status: "converted" }),
-    Lead.countDocuments({ status: "lost" }),
-  ]);
+export async function bulkAnalyzeLeads(ids: string[]) {
+  const result = await Lead.updateMany(
+    { _id: { $in: ids } },
+    { $set: { analyzed: true } }
+  );
+  return result.modifiedCount;
+}
+
+export async function getDashboardStats(startDate?: Date, endDate?: Date) {
+  const dateFilter = startDate && endDate
+    ? { createdAt: { $gte: startDate, $lte: endDate } }
+    : {};
+
+  const [totalLeads, discovered, analyzed, qualified, emailSent, replied, converted, lost] =
+    await Promise.all([
+      Lead.countDocuments({ ...dateFilter }),
+      Lead.countDocuments({ status: "discovered", ...dateFilter }),
+      Lead.countDocuments({ status: "analyzed", ...dateFilter }),
+      Lead.countDocuments({ status: "qualified", ...dateFilter }),
+      Lead.countDocuments({ status: "email_sent", ...dateFilter }),
+      Lead.countDocuments({ status: "replied", ...dateFilter }),
+      Lead.countDocuments({ status: "converted", ...dateFilter }),
+      Lead.countDocuments({ status: "lost", ...dateFilter }),
+    ]);
 
   const [hotLeads, warmLeads, coolLeads, skipLeads] = await Promise.all([
-    Lead.countDocuments({ leadCategory: "hot" }),
-    Lead.countDocuments({ leadCategory: "warm" }),
-    Lead.countDocuments({ leadCategory: "cool" }),
-    Lead.countDocuments({ leadCategory: "skip" }),
+    Lead.countDocuments({ leadCategory: "hot", ...dateFilter }),
+    Lead.countDocuments({ leadCategory: "warm", ...dateFilter }),
+    Lead.countDocuments({ leadCategory: "cool", ...dateFilter }),
+    Lead.countDocuments({ leadCategory: "skip", ...dateFilter }),
   ]);
 
   const topCities = await Lead.aggregate([
+    { $match: dateFilter },
     { $group: { _id: "$city", count: { $sum: 1 } } },
     { $sort: { count: -1 } },
     { $limit: 5 },
@@ -161,14 +168,7 @@ export async function getDashboardStats() {
   ]);
 
   return {
-    totalLeads,
-    discovered,
-    analyzed,
-    qualified,
-    emailSent,
-    replied,
-    converted,
-    lost,
+    totalLeads, discovered, analyzed, qualified, emailSent, replied, converted, lost,
     revenue: converted * 199,
     conversionRate: emailSent > 0 ? ((converted / emailSent) * 100).toFixed(1) : "0",
     topCities,

@@ -331,44 +331,116 @@ export default function LeadDetailPage() {
 
           {/* Website Analysis */}
           {lead.websiteAnalysis && (
-            <div className="bg-white rounded-xs border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#EDE8E0] flex items-center justify-between">
-                <h2 className="text-sm font-bold text-[#1A2E22]">Website Analysis</h2>
-                <span className="text-xs font-semibold text-[#3D8B5E] tabular-nums">{lead.websiteAnalysis.overallScore}/100</span>
-              </div>
-              <div className="p-5">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                  {[
-                    { label: "Performance", value: lead.websiteAnalysis.performanceScore, icon: <Zap size={13} /> },
-                    { label: "SEO", value: lead.websiteAnalysis.seoScore, icon: <TrendingUp size={13} /> },
-                    { label: "Visual", value: `${lead.websiteAnalysis.visualScore}/10`, icon: <Globe size={13} /> },
-                    { label: "Content", value: lead.websiteAnalysis.contentScore, icon: <MessageSquare size={13} /> },
-                  ].map((s) => (
-                    <div key={s.label} className="bg-[#F5F1EB] rounded-xs p-3">
-                      <div className="flex items-center gap-1.5 mb-1.5 text-[#6B7570]">
-                        {s.icon}
-                        <span className="text-[10px] font-semibold uppercase tracking-wider">{s.label}</span>
-                      </div>
-                      <div className="text-lg font-bold text-[#1A2E22] tabular-nums">{s.value}</div>
-                    </div>
-                  ))}
-                </div>
-                {lead.websiteAnalysis.issues?.length > 0 && (
-                  <div className="border-t border-[#EDE8E0] pt-4">
-                    <h3 className="text-xs font-semibold text-[#6B7570] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                      <AlertCircle size={12} />
-                      Issues Found ({lead.websiteAnalysis.issues.length})
-                    </h3>
-                    <ul className="space-y-1.5">
-                      {lead.websiteAnalysis.issues.map((issue, idx) => (
-                        <li key={idx} className="text-[13px] text-[#3D5347] flex items-start gap-2">
-                          <span className="text-[#C47A4A] mt-0.5 shrink-0">●</span>
-                          {issue}
-                        </li>
-                      ))}
-                    </ul>
+            <div className="space-y-4">
+              {/* Screenshot */}
+              {lead.websiteAnalysis.screenshots?.desktop && (
+                <div className="bg-white rounded-xs border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+                  <div className="px-5 py-4 border-b border-[#EDE8E0]">
+                    <h2 className="text-sm font-bold text-[#1A2E22]">Website Screenshot</h2>
                   </div>
-                )}
+                  <div className="p-5">
+                    <img src={lead.websiteAnalysis.screenshots.desktop} alt="Website screenshot" className="w-full rounded-xs border border-[#E8E2D8]" />
+                  </div>
+                </div>
+              )}
+
+              {/* Score Overview */}
+              <div className="bg-white rounded-xs border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+                <div className="px-5 py-4 border-b border-[#EDE8E0] flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-[#1A2E22]">Website Analysis</h2>
+                  {lead.websiteQualityScore !== undefined && (
+                    <span className={`text-xs font-bold tabular-nums px-2 py-0.5 rounded-xs ${
+                      lead.websiteQualityScore <= 30 ? "bg-[#C75555]/10 text-[#C75555]" :
+                      lead.websiteQualityScore <= 50 ? "bg-[#C47A4A]/10 text-[#C47A4A]" :
+                      lead.websiteQualityScore <= 70 ? "bg-[#B89A4A]/10 text-[#B89A4A]" :
+                      "bg-[#3D8B5E]/10 text-[#3D8B5E]"
+                    }`}>{lead.websiteQualityScore}/100</span>
+                  )}
+                </div>
+                <div className="p-5">
+                  {/* Summary */}
+                  {lead.websiteAnalysis.oneLineSummary && (
+                    <p className="text-[13px] text-[#3D5347] italic mb-4 pb-4 border-b border-[#EDE8E0]">
+                      &ldquo;{lead.websiteAnalysis.oneLineSummary}&rdquo;
+                    </p>
+                  )}
+
+                  {/* Category scores */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    {[
+                      { label: "Visual Quality", value: lead.websiteAnalysis.visualCategory, icon: <Globe size={13} /> },
+                      { label: "Content Quality", value: lead.websiteAnalysis.contentCategory, icon: <MessageSquare size={13} /> },
+                    ].map((s) => (
+                      <div key={s.label} className="bg-[#F5F1EB] rounded-xs p-3">
+                        <div className="flex items-center gap-1.5 mb-1.5 text-[#6B7570]">
+                          {s.icon}
+                          <span className="text-[10px] font-semibold uppercase tracking-wider">{s.label}</span>
+                        </div>
+                        <div className="text-sm font-bold text-[#1A2E22] capitalize">{s.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Visual breakdown */}
+                  {lead.websiteAnalysis.visualSubScores && (
+                    <div className="border-t border-[#EDE8E0] pt-4 mb-4">
+                      <h3 className="text-xs font-semibold text-[#6B7570] uppercase tracking-wider mb-2.5">Visual Breakdown</h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {Object.entries(lead.websiteAnalysis.visualSubScores).map(([key, val]) => (
+                          <div key={key} className="flex items-center justify-between bg-[#FAF8F5] rounded-xs px-2.5 py-1.5">
+                            <span className="text-[11px] text-[#6B7570] capitalize">{key.replace(/([A-Z])/g, " $1").trim()}</span>
+                            <span className={`text-[10px] font-bold capitalize ${
+                              val === "poor" ? "text-[#C75555]" : val === "fair" ? "text-[#C47A4A]" : val === "good" ? "text-[#3D8B5E]" : "text-[#2D7A4E]"
+                            }`}>{val}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {lead.websiteAnalysis.designEraEstimate && (
+                        <p className="text-[11px] text-[#8A9590] mt-2">Design era: ~{lead.websiteAnalysis.designEraEstimate}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Content checklist */}
+                  {lead.websiteAnalysis.contentItems && (
+                    <div className="border-t border-[#EDE8E0] pt-4 mb-4">
+                      <h3 className="text-xs font-semibold text-[#6B7570] uppercase tracking-wider mb-2.5">
+                        Content ({lead.websiteAnalysis.contentItemsPresentCount}/12 items)
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {Object.entries(lead.websiteAnalysis.contentItems).map(([key, item]) => (
+                          <div key={key} className="flex items-center gap-2 text-[12px]">
+                            <span className={item.present ? "text-[#3D8B5E]" : "text-[#C75555]"}>
+                              {item.present ? "✓" : "✗"}
+                            </span>
+                            <span className="text-[#3D5347] capitalize">{key.replace(/([A-Z])/g, " $1").trim()}</span>
+                            <span className={`text-[10px] font-medium ${
+                              item.quality === "good" ? "text-[#3D8B5E]" : item.quality === "basic" ? "text-[#C47A4A]" : "text-[#C75555]"
+                            }`}>{item.quality}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Issues */}
+                  {lead.websiteAnalysis.issuesList?.length > 0 && (
+                    <div className="border-t border-[#EDE8E0] pt-4">
+                      <h3 className="text-xs font-semibold text-[#6B7570] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                        <AlertCircle size={12} />
+                        Issues Found ({lead.websiteAnalysis.issuesList.length})
+                      </h3>
+                      <ul className="space-y-1.5">
+                        {lead.websiteAnalysis.issuesList.map((issue: string, idx: number) => (
+                          <li key={idx} className="text-[13px] text-[#3D5347] flex items-start gap-2">
+                            <span className="text-[#C47A4A] mt-0.5 shrink-0">●</span>
+                            {issue}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

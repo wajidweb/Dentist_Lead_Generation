@@ -47,9 +47,12 @@ export default function DashboardLayout({
           >
             <Menu size={22} />
           </button>
-          <span className="font-bold text-sm px-2.5 py-1 rounded-xs text-white bg-[#2A4A3A]">
-            DentalLeads
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/DentalLeads_final_logo.svg"
+            alt="DentalLeads"
+            className="h-14 w-auto drop-shadow-sm animate-[logoFloat_3s_ease-in-out_infinite]"
+          />
         </header>
 
         <main className="flex-1 bg-[#F5F1EB] p-4 sm:p-6 lg:p-8">

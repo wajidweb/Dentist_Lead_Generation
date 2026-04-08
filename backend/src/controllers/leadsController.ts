@@ -8,6 +8,7 @@ import {
   getDashboardStats,
   bulkDeleteLeads,
   bulkUpdateLeadStatus,
+  bulkAnalyzeLeads,
 } from "../services/leadsService";
 
 export const list = async (req: Request, res: Response) => {
@@ -18,6 +19,9 @@ export const list = async (req: Request, res: Response) => {
       status: req.query.status as string,
       category: req.query.category as string,
       city: req.query.city as string,
+      analyzed: req.query.analyzed !== undefined
+        ? req.query.analyzed === "true"
+        : undefined,
       minLeadScore: req.query.minLeadScore
         ? Number(req.query.minLeadScore)
         : undefined,
@@ -116,9 +120,12 @@ export const remove = async (req: Request, res: Response) => {
   }
 };
 
-export const stats = async (_req: Request, res: Response) => {
+export const stats = async (req: Request, res: Response) => {
   try {
-    const data = await getDashboardStats();
+    const { startDate, endDate } = req.query;
+    const start = startDate ? new Date(startDate as string) : undefined;
+    const end = endDate ? new Date(endDate as string) : undefined;
+    const data = await getDashboardStats(start, end);
     res.json(data);
   } catch (error) {
     console.error("Dashboard stats error:", error);
@@ -157,5 +164,20 @@ export const bulkChangeStatus = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Bulk status update error:", error);
     res.status(500).json({ message: "Failed to bulk update leads" });
+  }
+};
+
+export const bulkAnalyze = async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ message: "ids array is required" });
+      return;
+    }
+    const count = await bulkAnalyzeLeads(ids);
+    res.json({ message: `${count} leads marked as analyzed`, count });
+  } catch (error) {
+    console.error("Bulk analyze error:", error);
+    res.status(500).json({ message: "Failed to analyze leads" });
   }
 };

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./store/authStore";
-import { MapPin, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -67,10 +67,12 @@ export default function LoginPage() {
 
           <div className="p-8 sm:p-10">
             <div className="text-center mb-8 animate-[fadeIn_0.8s_ease-out_0.2s_both]">
-              <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xs mb-5 font-bold text-lg text-white shadow-sm" style={{ backgroundColor: "#2A4A3A" }}>
-                <MapPin size={22} strokeWidth={2.5} />
-                DentalLeads
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/DentalLeads_logo_dark.svg"
+                alt="DentalLeads"
+                className="h-52 w-auto mx-auto mb-4 drop-shadow-lg animate-[logoPop_0.65s_cubic-bezier(0.34,1.56,0.64,1)_0.05s_both]"
+              />
               <h1 className="text-2xl font-bold text-[#1A2E22]">Welcome Back</h1>
               <p className="text-[#8A9590] mt-1 text-sm">
                 Sign in to your admin dashboard

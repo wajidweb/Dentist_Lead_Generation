@@ -207,7 +207,14 @@ export default function SearchPage() {
                   </div>
                 )}
               </div>
+              
               <div className="flex items-center gap-2">
+                <Link
+                  href="/dashboard/analyze-leads"
+                  className="text-xs font-medium text-white px-3 py-1.5 rounded-xs bg-[#2A4A3A] hover:bg-[#1E3A2E] transition"
+                >
+                  Analyze Leads
+                </Link>
                 <Link
                   href="/dashboard/leads"
                   className="text-xs font-medium text-[#2A4A3A] px-3 py-1.5 rounded-xs bg-[#3D8B5E]/10 hover:bg-[#3D8B5E]/20 transition"
