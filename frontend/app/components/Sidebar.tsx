@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "../store/authStore";
-import { LayoutGrid, Search, Users, BarChart3, Settings, LogOut, X, ClipboardCheck } from "lucide-react";
+import { LayoutGrid, Search, Users, BarChart3, LogOut, X, ClipboardCheck } from "lucide-react";
 
 const menuItems = [
   {
@@ -30,11 +30,6 @@ const menuItems = [
     label: "Analytics",
     href: "/dashboard/analytics",
     icon: <BarChart3 size={20} />,
-  },
-  {
-    label: "Settings",
-    href: "/dashboard/settings",
-    icon: <Settings size={20} />,
   },
 ];
 
@@ -74,13 +69,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        <div className="px-6 py-6 border-b border-[#2A4A3A] flex items-center justify-between">
-          <span className="font-bold text-lg px-3 py-1.5 rounded-xs text-white inline-block bg-[#2A4A3A]">
-            DentalLeads
-          </span>
+        <div className="px-6 py-3 border-b border-[#2A4A3A] relative flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/DentalLeads_final_logo.svg"
+            alt="DentalLeads"
+            className="h-24 w-auto drop-shadow-md animate-[logoFloat_3s_ease-in-out_infinite] hover:scale-105 transition-transform duration-300"
+          />
           <button
             onClick={onClose}
-            className="lg:hidden p-1 text-[#7BAF8E] hover:text-white transition"
+            className="lg:hidden absolute right-4 p-1 text-[#7BAF8E] hover:text-white transition"
           >
             <X size={20} />
           </button>

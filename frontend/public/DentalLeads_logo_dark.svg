@@ -1,0 +1,19 @@
+<svg width="100%" viewBox="180 120 320 380" xmlns="http://www.w3.org/2000/svg">
+
+<circle cx="340" cy="270" r="120" fill="#085041"/>
+<circle cx="340" cy="270" r="118" fill="none" stroke="#1D9E75" stroke-width="1.8"/>
+<circle cx="340" cy="270" r="108" fill="none" stroke="#1D9E75" stroke-width="0.6" opacity="0.4"/>
+<circle cx="340" cy="270" r="95" fill="#0F6E56" opacity="0.35"/>
+
+<path d="M312,238 Q312,215 340,215 Q368,215 368,238 L368,302 Q368,325 340,325 Q312,325 312,302 Z" fill="none" stroke="#5DCAA5" stroke-width="3.2" stroke-linecap="round"/>
+<path d="M312,268 L368,268" stroke="#5DCAA5" stroke-width="1.8" stroke-linecap="round"/>
+<path d="M326,238 Q326,226 340,226 Q354,226 354,238 L354,260" fill="none" stroke="#9FE1CB" stroke-width="1.8" stroke-linecap="round"/>
+<path d="M326,276 L326,302 Q326,314 340,314 Q354,314 354,302 L354,276" fill="none" stroke="#9FE1CB" stroke-width="1.8" stroke-linecap="round"/>
+
+<circle cx="340" cy="243" r="7.5" fill="#D85A30"/>
+
+<text x="340" y="458" font-family="Arial, sans-serif" font-size="52" font-weight="600" text-anchor="middle">
+  <tspan fill="#2A4A3A">Dental</tspan><tspan fill="#3D8B5E">Leads</tspan>
+</text>
+
+</svg>
