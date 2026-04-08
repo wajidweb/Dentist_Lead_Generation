@@ -30,7 +30,6 @@ import {
   ChevronRight,
   BarChart3,
   Users,
-  Settings,
   Activity,
   Target,
   Zap,
@@ -116,6 +115,7 @@ export default function DashboardPage() {
   const { user } = useAuthStore();
   const { stats, statsLoading, fetchDashboardStats } = useLeadsStore();
   const [mounted, setMounted] = useState(false);
+  const [hoveredCategory, setHoveredCategory] = useState<{ name: string; value: number; color: string } | null>(null);
 
   useEffect(() => {
     fetchDashboardStats();
@@ -148,15 +148,13 @@ export default function DashboardPage() {
       ]
     : [];
 
-  /* ─── Donut data ─── */
-  const donutData = stats
+  /* ─── Category donut data ─── */
+  const donutData = stats?.categories
     ? [
-        { name: "Discovered", value: stats.discovered, color: "#A8D4B8" },
-        { name: "Analyzed", value: stats.analyzed, color: "#7BC095" },
-        { name: "Qualified", value: stats.qualified, color: "#3D8B5E" },
-        { name: "Emailed", value: stats.emailSent, color: "#2D7A4E" },
-        { name: "Replied", value: stats.replied, color: "#1E6B3E" },
-        { name: "Converted", value: stats.converted, color: "#155030" },
+        { name: "Hot",  value: stats.categories.hot,  color: "#C75555" },
+        { name: "Warm", value: stats.categories.warm, color: "#C47A4A" },
+        { name: "Cool", value: stats.categories.cool, color: "#3D8B5E" },
+        { name: "Skip", value: stats.categories.skip, color: "#B5AFA5" },
       ].filter((d) => d.value > 0)
     : [];
 
@@ -218,7 +216,7 @@ export default function DashboardPage() {
 
       {/* ── KPI Cards + Sparkline ── */}
       <div
-        className={`grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4 transition-all duration-500 delay-75 ${
+        className={`grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 transition-all duration-500 delay-75 ${
           mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
         }`}
       >
@@ -393,8 +391,8 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xs p-5 sm:p-6 border border-[#D8D2C8] shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="text-sm font-bold text-[#1A2E22]">Distribution</h2>
-              <p className="text-[11px] text-[#6B7570] mt-0.5">Pipeline breakdown</p>
+              <h2 className="text-sm font-bold text-[#1A2E22]">Lead Quality</h2>
+              <p className="text-[11px] text-[#6B7570] mt-0.5">Breakdown by category</p>
             </div>
           </div>
           {statsLoading ? (
@@ -415,29 +413,29 @@ export default function DashboardPage() {
                       strokeWidth={0}
                       isAnimationActive
                       animationDuration={1200}
+                      onMouseLeave={() => setHoveredCategory(null)}
                     >
                       {donutData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
+                        <Cell
+                          key={i}
+                          fill={entry.color}
+                          opacity={hoveredCategory && hoveredCategory.name !== entry.name ? 0.4 : 1}
+                          style={{ cursor: "pointer", transition: "opacity 0.15s" }}
+                          onMouseEnter={() => setHoveredCategory(entry)}
+                        />
                       ))}
                     </Pie>
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.[0]) return null;
-                        const d = payload[0].payload;
-                        return (
-                          <div className="bg-[#1A2E22] text-white px-3 py-2 rounded-xs shadow-xl text-xs border border-[#2A4A3A]">
-                            <p className="font-bold">{d.name}</p>
-                            <p className="tabular-nums text-[#A8D4B8]">{d.value} leads</p>
-                          </div>
-                        );
-                      }}
-                    />
                   </PieChart>
                 </ResponsiveContainer>
-                {/* Center label */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-2xl font-bold text-[#1A2E22] tabular-nums">{stats?.totalLeads ?? 0}</p>
-                  <p className="text-[10px] font-semibold text-[#8A9590] uppercase tracking-wider">Total</p>
+                {/* Center label — updates on hover */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-all duration-150">
+                  <p className="text-2xl font-bold tabular-nums transition-all duration-150"
+                    style={{ color: hoveredCategory ? hoveredCategory.color : "#C75555" }}>
+                    {hoveredCategory ? hoveredCategory.value : (stats?.categories?.hot ?? 0)}
+                  </p>
+                  <p className="text-[10px] font-semibold text-[#8A9590] uppercase tracking-wider transition-all duration-150">
+                    {hoveredCategory ? hoveredCategory.name : "Hot"}
+                  </p>
                 </div>
               </div>
               {/* Donut legend */}
@@ -528,14 +526,6 @@ export default function DashboardPage() {
                 icon: <TrendingUp size={18} />,
                 iconBg: "bg-[#C47A4A]/10",
                 iconColor: "text-[#C47A4A]",
-              },
-              {
-                label: "Settings",
-                desc: "Configure your account",
-                href: "/dashboard/settings",
-                icon: <Settings size={18} />,
-                iconBg: "bg-[#F5F1EB]",
-                iconColor: "text-[#6B7570]",
               },
             ].map((action) => (
               <Link

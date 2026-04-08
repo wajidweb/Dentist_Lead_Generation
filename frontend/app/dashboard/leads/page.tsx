@@ -259,7 +259,7 @@ export default function LeadsPage() {
 
       {/* Bulk Actions Bar */}
       {selected.size > 0 && (
-        <div className="mb-4 bg-[#2A4A3A] rounded-xs px-5 py-3 flex items-center justify-between animate-[fadeIn_0.15s_ease-out]">
+        <div className="mb-4 bg-[#2A4A3A] rounded-xs px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 animate-[fadeIn_0.15s_ease-out]">
           <div className="flex items-center gap-3">
             <button onClick={() => setSelected(new Set())} className="text-white/60 hover:text-white transition">
               <X size={16} />
@@ -268,7 +268,7 @@ export default function LeadsPage() {
               {selected.size} lead{selected.size > 1 ? "s" : ""} selected
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={bulkStatus}
               onChange={(e) => setBulkStatus(e.target.value)}
@@ -291,7 +291,7 @@ export default function LeadsPage() {
                 Apply
               </button>
             )}
-            <div className="w-px h-5 bg-white/20 mx-1" />
+            <div className="w-px h-5 bg-white/20 mx-1 hidden sm:block" />
             <button
               onClick={handleBulkDelete}
               className="px-3 py-1.5 rounded-xs text-xs font-medium text-[#C75555] bg-[#C75555]/10 hover:bg-[#C75555]/20 border border-[#C75555]/20 transition flex items-center gap-1.5"
@@ -308,8 +308,9 @@ export default function LeadsPage() {
         className={`overflow-hidden transition-all duration-300 ease-in-out ${showFilters || activeFilterCount > 0 ? "max-h-[500px] opacity-100 mb-4" : "max-h-0 opacity-0 mb-0"}`}
       >
         <div className="bg-white rounded-xs border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-3">
+            {/* Search — full width on top */}
+            <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7570]" />
               <input
                 type="text"
@@ -319,36 +320,37 @@ export default function LeadsPage() {
                 className="w-full border border-[#CCC7BE] rounded-xs pl-9 pr-3 py-2.5 text-sm text-[#1A2E22] placeholder-[#8A9590] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 bg-[#FAF8F5] focus:bg-white transition-all"
               />
             </div>
-            <input
-              type="text"
-              placeholder="Filter by city..."
-              value={filters.city}
-              onChange={(e) => handleFilterChange("city", e.target.value)}
-              className="sm:w-44 border border-[#CCC7BE] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] placeholder-[#8A9590] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 bg-[#FAF8F5] focus:bg-white transition-all"
-            />
-            <select
-              value={filters.status}
-              onChange={(e) => handleFilterChange("status", e.target.value)}
-              className="sm:w-44 border border-[#CCC7BE] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 focus:bg-white transition-all"
-            >
-              <option value="">All Statuses</option>
-              <option value="discovered">Discovered</option>
-              <option value="analyzed">Analyzed</option>
-              <option value="qualified">Qualified</option>
-              <option value="website_created">Website Created</option>
-              <option value="email_sent">Email Sent</option>
-              <option value="replied">Replied</option>
-              <option value="converted">Converted</option>
-              <option value="lost">Lost</option>
-            </select>
-            <div className="flex items-center gap-2">
+            {/* Rest — 2-col grid on mobile, row on sm+ */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3">
+              <input
+                type="text"
+                placeholder="Filter by city..."
+                value={filters.city}
+                onChange={(e) => handleFilterChange("city", e.target.value)}
+                className="border border-[#CCC7BE] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] placeholder-[#8A9590] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 bg-[#FAF8F5] focus:bg-white transition-all sm:w-44"
+              />
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange("status", e.target.value)}
+                className="border border-[#CCC7BE] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 focus:bg-white transition-all sm:w-44"
+              >
+                <option value="">All Statuses</option>
+                <option value="discovered">Discovered</option>
+                <option value="analyzed">Analyzed</option>
+                <option value="qualified">Qualified</option>
+                <option value="website_created">Website Created</option>
+                <option value="email_sent">Email Sent</option>
+                <option value="replied">Replied</option>
+                <option value="converted">Converted</option>
+                <option value="lost">Lost</option>
+              </select>
               <select
                 value={`${filters.sortBy}:${filters.sortOrder}`}
                 onChange={(e) => {
                   const [sortBy, sortOrder] = e.target.value.split(":");
                   setFilters((prev) => ({ ...prev, sortBy, sortOrder: sortOrder as "asc" | "desc", page: 1 }));
                 }}
-                className="sm:w-48 border border-[#CCC7BE] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 focus:bg-white transition-all"
+                className="col-span-2 sm:col-span-1 border border-[#CCC7BE] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 focus:bg-white transition-all sm:w-48"
               >
                 <option value="leadScore:desc">Highest Lead Score</option>
                 <option value="websiteQualityScore:asc">Worst Website First</option>
@@ -359,7 +361,7 @@ export default function LeadsPage() {
               {activeFilterCount > 0 && (
                 <button
                   onClick={() => setFilters((prev) => ({ ...prev, status: "", category: "", city: "", search: "", page: 1 }))}
-                  className="text-xs font-medium text-[#C75555] px-3 py-2.5 rounded-xs hover:bg-[#C75555]/5 transition whitespace-nowrap"
+                  className="col-span-2 sm:col-span-1 text-xs font-medium text-[#C75555] px-3 py-2.5 rounded-xs hover:bg-[#C75555]/5 transition whitespace-nowrap"
                 >
                   Clear all
                 </button>
@@ -401,7 +403,7 @@ export default function LeadsPage() {
                   {selected.size > 0 ? `${selected.size} selected` : "Select all"}
                 </span>
               </div>
-              <div className="flex items-center gap-1 text-xs text-[#6B7570]">
+              <div className="hidden sm:flex items-center gap-1 text-xs text-[#6B7570]">
                 Showing
                 <select
                   value={filters.limit}
@@ -592,15 +594,16 @@ export default function LeadsPage() {
                   Page <span className="font-medium text-[#3D5347]">{page}</span> of <span className="font-medium text-[#3D5347]">{totalPages}</span>
                 </p>
                 <div className="flex items-center gap-1">
+                  {/* Page number buttons — desktop only */}
                   {page > 3 && (
                     <>
                       <button
                         onClick={() => setFilters((prev) => ({ ...prev, page: 1 }))}
-                        className="w-8 h-8 rounded-xs text-xs font-medium text-[#3D5347] hover:bg-[#FAF8F5] transition"
+                        className="hidden sm:block w-8 h-8 rounded-xs text-xs font-medium text-[#3D5347] hover:bg-[#FAF8F5] transition"
                       >
                         1
                       </button>
-                      {page > 4 && <span className="w-8 h-8 flex items-center justify-center text-xs text-[#8A9590]">...</span>}
+                      {page > 4 && <span className="hidden sm:flex w-8 h-8 items-center justify-center text-xs text-[#8A9590]">...</span>}
                     </>
                   )}
                   {(() => {
@@ -612,7 +615,7 @@ export default function LeadsPage() {
                       <button
                         key={p}
                         onClick={() => setFilters((prev) => ({ ...prev, page: p }))}
-                        className={`w-8 h-8 rounded-xs text-xs font-medium transition ${
+                        className={`hidden sm:block w-8 h-8 rounded-xs text-xs font-medium transition ${
                           page === p ? "bg-[#2A4A3A] text-white shadow-sm" : "text-[#3D5347] hover:bg-[#FAF8F5]"
                         }`}
                       >
@@ -622,16 +625,16 @@ export default function LeadsPage() {
                   })()}
                   {page < totalPages - 2 && (
                     <>
-                      {page < totalPages - 3 && <span className="w-8 h-8 flex items-center justify-center text-xs text-[#8A9590]">...</span>}
+                      {page < totalPages - 3 && <span className="hidden sm:flex w-8 h-8 items-center justify-center text-xs text-[#8A9590]">...</span>}
                       <button
                         onClick={() => setFilters((prev) => ({ ...prev, page: totalPages }))}
-                        className="w-8 h-8 rounded-xs text-xs font-medium text-[#3D5347] hover:bg-[#FAF8F5] transition"
+                        className="hidden sm:block w-8 h-8 rounded-xs text-xs font-medium text-[#3D5347] hover:bg-[#FAF8F5] transition"
                       >
                         {totalPages}
                       </button>
                     </>
                   )}
-                  <div className="flex items-center gap-1 ml-2 pl-2 border-l border-[#EDE8E0]">
+                  <div className="flex items-center gap-1 sm:ml-2 sm:pl-2 sm:border-l sm:border-[#EDE8E0]">
                     <button
                       onClick={() => setFilters((prev) => ({ ...prev, page: prev.page - 1 }))}
                       disabled={page <= 1}

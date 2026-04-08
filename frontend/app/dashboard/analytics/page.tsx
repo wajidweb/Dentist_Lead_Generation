@@ -218,8 +218,8 @@ export default function AnalyticsPage() {
 
         {/* Date Filter */}
         <div className="flex flex-col items-start sm:items-end gap-2">
-          <div className="flex items-center gap-1 bg-white border border-[#E8E2D8] rounded-xs p-1 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <Calendar size={14} className="text-[#8A9590] ml-2 mr-1" />
+          <div className="flex items-center gap-1 bg-white border border-[#E8E2D8] rounded-xs p-1 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-x-auto max-w-full">
+            <Calendar size={14} className="text-[#8A9590] ml-2 mr-1 shrink-0" />
             {PRESETS.map((p) => (
               <button
                 key={p.value}
@@ -235,14 +235,16 @@ export default function AnalyticsPage() {
             ))}
           </div>
           {showCustom && (
-            <div className="flex items-center gap-2 bg-white border border-[#E8E2D8] rounded-xs px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
-                className="text-xs text-[#1A2E22] bg-[#FAF8F5] border border-[#DDD8D0] rounded-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#3D8B5E]" />
-              <span className="text-xs text-[#8A9590]">to</span>
-              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
-                className="text-xs text-[#1A2E22] bg-[#FAF8F5] border border-[#DDD8D0] rounded-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#3D8B5E]" />
+            <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 bg-white border border-[#E8E2D8] rounded-xs px-3 py-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)] w-full sm:w-auto">
+              <div className="flex items-center gap-2 flex-wrap">
+                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
+                  className="text-xs text-[#1A2E22] bg-[#FAF8F5] border border-[#DDD8D0] rounded-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#3D8B5E]" />
+                <span className="text-xs text-[#8A9590]">to</span>
+                <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
+                  className="text-xs text-[#1A2E22] bg-[#FAF8F5] border border-[#DDD8D0] rounded-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#3D8B5E]" />
+              </div>
               <button onClick={handleCustomApply} disabled={!customStart || !customEnd}
-                className="px-3 py-1 bg-[#2A4A3A] text-white text-xs font-medium rounded-xs disabled:opacity-40 hover:bg-[#3D8B5E] transition-colors">
+                className="px-3 py-1 bg-[#2A4A3A] text-white text-xs font-medium rounded-xs disabled:opacity-40 hover:bg-[#3D8B5E] transition-colors shrink-0">
                 Apply
               </button>
             </div>
