@@ -65,6 +65,7 @@ export default function LeadsPage() {
   const [filters, setFilters] = useState({
     page: 1,
     limit: 20,
+    analyzed: "true" as string,
     status: "",
     category: "",
     city: "",

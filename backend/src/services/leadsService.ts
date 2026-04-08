@@ -6,6 +6,7 @@ interface LeadFilters {
   status?: string;
   category?: string;
   city?: string;
+  analyzed?: boolean;
   minLeadScore?: number;
   maxLeadScore?: number;
   minWebsiteScore?: number;
@@ -22,6 +23,7 @@ export async function getLeads(filters: LeadFilters) {
     status,
     category,
     city,
+    analyzed,
     minLeadScore,
     maxLeadScore,
     minWebsiteScore,
@@ -37,6 +39,7 @@ export async function getLeads(filters: LeadFilters) {
   if (category) query.leadCategory = category;
   if (city) query.city = { $regex: city, $options: "i" };
   if (search) query.businessName = { $regex: search, $options: "i" };
+  if (analyzed !== undefined) query.analyzed = analyzed;
 
   if (minLeadScore !== undefined || maxLeadScore !== undefined) {
     query.leadScore = {};
@@ -121,6 +124,14 @@ export async function bulkUpdateLeadStatus(ids: string[], status: string) {
   const result = await Lead.updateMany(
     { _id: { $in: ids } },
     { $set: { status } }
+  );
+  return result.modifiedCount;
+}
+
+export async function bulkAnalyzeLeads(ids: string[]) {
+  const result = await Lead.updateMany(
+    { _id: { $in: ids } },
+    { $set: { analyzed: true } }
   );
   return result.modifiedCount;
 }

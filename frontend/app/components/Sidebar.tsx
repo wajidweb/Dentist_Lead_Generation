@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "../store/authStore";
-import { LayoutGrid, Search, Users, BarChart3, Settings, LogOut, X } from "lucide-react";
+import { LayoutGrid, Search, Users, BarChart3, Settings, LogOut, X, ClipboardCheck } from "lucide-react";
 
 const menuItems = [
   {
@@ -15,6 +15,11 @@ const menuItems = [
     label: "Search",
     href: "/dashboard/search",
     icon: <Search size={20} />,
+  },
+  {
+    label: "Analyze Leads",
+    href: "/dashboard/analyze-leads",
+    icon: <ClipboardCheck size={20} />,
   },
   {
     label: "Leads",

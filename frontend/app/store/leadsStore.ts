@@ -38,6 +38,7 @@ export interface Lead {
   status: string;
   customWebsiteUrl?: string;
   customWebsiteScreenshot?: string;
+  analyzed: boolean;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -78,6 +79,7 @@ interface LeadsStore {
   clearCurrentLead: () => void;
   bulkDeleteLeads: (ids: string[]) => Promise<number>;
   bulkUpdateStatus: (ids: string[], status: string) => Promise<number>;
+  bulkAnalyzeLeads: (ids: string[]) => Promise<number>;
 }
 
 export const useLeadsStore = create<LeadsStore>((set, get) => ({
@@ -229,6 +231,25 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
         leads: leads.map((l) =>
           ids.includes(l._id) ? { ...l, status } : l
         ),
+      });
+      return data.count || 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  bulkAnalyzeLeads: async (ids) => {
+    try {
+      const res = await apiFetch("/leads/bulk-analyze", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) return 0;
+      const { leads } = get();
+      set({
+        leads: leads.filter((l) => !ids.includes(l._id)),
+        total: get().total - (data.count || 0),
       });
       return data.count || 0;
     } catch {

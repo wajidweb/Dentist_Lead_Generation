@@ -108,6 +108,7 @@ export interface ILead extends Document {
   customWebsiteUrl?: string;
   customWebsiteScreenshot?: string;
   emailHistory: IEmailHistoryEntry[];
+  analyzed: boolean;
   notes?: string;
   searchQuery: string;
   searchId: mongoose.Types.ObjectId;
@@ -238,6 +239,7 @@ const leadSchema = new Schema<ILead>(
     customWebsiteUrl: { type: String },
     customWebsiteScreenshot: { type: String },
     emailHistory: [emailHistorySchema],
+    analyzed: { type: Boolean, default: false },
     notes: { type: String },
     searchQuery: { type: String, required: true },
     searchId: { type: Schema.Types.ObjectId, ref: "SearchHistory", required: true },
@@ -249,5 +251,6 @@ leadSchema.index({ city: 1, status: 1 });
 leadSchema.index({ leadScore: -1 });
 leadSchema.index({ googleRating: -1 });
 leadSchema.index({ status: 1 });
+leadSchema.index({ analyzed: 1 });
 
 export default mongoose.model<ILead>("Lead", leadSchema);
