@@ -136,35 +136,32 @@ export async function bulkAnalyzeLeads(ids: string[]) {
   return result.modifiedCount;
 }
 
-export async function getDashboardStats() {
-  const [
-    totalLeads,
-    discovered,
-    analyzed,
-    qualified,
-    emailSent,
-    replied,
-    converted,
-    lost,
-  ] = await Promise.all([
-    Lead.countDocuments(),
-    Lead.countDocuments({ status: "discovered" }),
-    Lead.countDocuments({ status: "analyzed" }),
-    Lead.countDocuments({ status: "qualified" }),
-    Lead.countDocuments({ status: "email_sent" }),
-    Lead.countDocuments({ status: "replied" }),
-    Lead.countDocuments({ status: "converted" }),
-    Lead.countDocuments({ status: "lost" }),
-  ]);
+export async function getDashboardStats(startDate?: Date, endDate?: Date) {
+  const dateFilter = startDate && endDate
+    ? { createdAt: { $gte: startDate, $lte: endDate } }
+    : {};
+
+  const [totalLeads, discovered, analyzed, qualified, emailSent, replied, converted, lost] =
+    await Promise.all([
+      Lead.countDocuments({ ...dateFilter }),
+      Lead.countDocuments({ status: "discovered", ...dateFilter }),
+      Lead.countDocuments({ status: "analyzed", ...dateFilter }),
+      Lead.countDocuments({ status: "qualified", ...dateFilter }),
+      Lead.countDocuments({ status: "email_sent", ...dateFilter }),
+      Lead.countDocuments({ status: "replied", ...dateFilter }),
+      Lead.countDocuments({ status: "converted", ...dateFilter }),
+      Lead.countDocuments({ status: "lost", ...dateFilter }),
+    ]);
 
   const [hotLeads, warmLeads, coolLeads, skipLeads] = await Promise.all([
-    Lead.countDocuments({ leadCategory: "hot" }),
-    Lead.countDocuments({ leadCategory: "warm" }),
-    Lead.countDocuments({ leadCategory: "cool" }),
-    Lead.countDocuments({ leadCategory: "skip" }),
+    Lead.countDocuments({ leadCategory: "hot", ...dateFilter }),
+    Lead.countDocuments({ leadCategory: "warm", ...dateFilter }),
+    Lead.countDocuments({ leadCategory: "cool", ...dateFilter }),
+    Lead.countDocuments({ leadCategory: "skip", ...dateFilter }),
   ]);
 
   const topCities = await Lead.aggregate([
+    { $match: dateFilter },
     { $group: { _id: "$city", count: { $sum: 1 } } },
     { $sort: { count: -1 } },
     { $limit: 5 },
@@ -172,14 +169,7 @@ export async function getDashboardStats() {
   ]);
 
   return {
-    totalLeads,
-    discovered,
-    analyzed,
-    qualified,
-    emailSent,
-    replied,
-    converted,
-    lost,
+    totalLeads, discovered, analyzed, qualified, emailSent, replied, converted, lost,
     revenue: converted * 199,
     conversionRate: emailSent > 0 ? ((converted / emailSent) * 100).toFixed(1) : "0",
     topCities,

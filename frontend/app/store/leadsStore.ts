@@ -75,7 +75,7 @@ interface LeadsStore {
   fetchLeadDetail: (id: string) => Promise<void>;
   updateLeadStatus: (id: string, status: string) => Promise<void>;
   deleteLead: (id: string) => Promise<void>;
-  fetchDashboardStats: () => Promise<void>;
+  fetchDashboardStats: (startDate?: string, endDate?: string) => Promise<void>;
   clearCurrentLead: () => void;
   bulkDeleteLeads: (ids: string[]) => Promise<number>;
   bulkUpdateStatus: (ids: string[], status: string) => Promise<number>;
@@ -172,10 +172,14 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
     }
   },
 
-  fetchDashboardStats: async () => {
+  fetchDashboardStats: async (startDate?: string, endDate?: string) => {
     set({ statsLoading: true });
     try {
-      const res = await apiFetch(`/leads/stats`);
+      const params = new URLSearchParams();
+      if (startDate) params.append("startDate", startDate);
+      if (endDate) params.append("endDate", endDate);
+      const query = params.toString() ? `?${params.toString()}` : "";
+      const res = await apiFetch(`/leads/stats${query}`);
       const data = await res.json();
       if (!res.ok) {
         set({ statsLoading: false });

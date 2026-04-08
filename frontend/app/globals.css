@@ -33,3 +33,14 @@ label,
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+@keyframes logoPop {
+  0%   { opacity: 0; transform: scale(0.55); }
+  70%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-4px); }
+}

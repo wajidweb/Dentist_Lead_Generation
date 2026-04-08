@@ -120,9 +120,12 @@ export const remove = async (req: Request, res: Response) => {
   }
 };
 
-export const stats = async (_req: Request, res: Response) => {
+export const stats = async (req: Request, res: Response) => {
   try {
-    const data = await getDashboardStats();
+    const { startDate, endDate } = req.query;
+    const start = startDate ? new Date(startDate as string) : undefined;
+    const end = endDate ? new Date(endDate as string) : undefined;
+    const data = await getDashboardStats(start, end);
     res.json(data);
   } catch (error) {
     console.error("Dashboard stats error:", error);
