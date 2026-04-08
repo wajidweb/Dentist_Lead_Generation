@@ -9,47 +9,57 @@ export interface IReview {
 }
 
 export interface IWebsiteAnalysis {
-  performanceScore: number;
-  seoScore: number;
-  accessibilityScore: number;
-  bestPracticesScore: number;
+  // PSI data
+  performanceScore: number | null;
+  seoScore: number | null;
+  accessibilityScore: number | null;
+  bestPracticesScore: number | null;
   loadTimeMs: number;
   isHttps: boolean;
-  hasViewportMeta: boolean;
   coreWebVitals: {
-    lcp: number;
-    cls: number;
-    inp: number;
+    lcp: number | null;
+    cls: number | null;
+    tbt: number | null;
   };
-  visualScore: number;
-  designModernity: number;
-  colorScheme: number;
-  layoutQuality: number;
-  imageQuality: number;
-  ctaVisibility: number;
-  trustSignals: number;
-  mobileExperience: number;
+
+  // Claude visual analysis (categorical)
+  visualCategory: 'poor' | 'fair' | 'good' | 'excellent';
+  visualSubScores: {
+    designModernity: 'poor' | 'fair' | 'good' | 'excellent';
+    colorScheme: 'poor' | 'fair' | 'good' | 'excellent';
+    layoutQuality: 'poor' | 'fair' | 'good' | 'excellent';
+    imageQuality: 'poor' | 'fair' | 'good' | 'excellent';
+    ctaVisibility: 'poor' | 'fair' | 'good' | 'excellent';
+    trustSignals: 'poor' | 'fair' | 'good' | 'excellent';
+    mobileExperience: 'poor' | 'fair' | 'good' | 'excellent';
+  };
   designEraEstimate: string;
   visualIssues: string[];
-  contentScore: number;
+
+  // Claude content analysis
+  contentCategory: 'poor' | 'fair' | 'good' | 'excellent';
   contentItems: {
     serviceDescriptions: { present: boolean; quality: string; note: string };
     doctorBios: { present: boolean; quality: string; note: string };
     patientTestimonials: { present: boolean; quality: string; note: string };
-    onlineBooking: { present: boolean; note: string };
+    onlineBooking: { present: boolean; quality: string; note: string };
     contactInfo: { present: boolean; quality: string; note: string };
-    insuranceInfo: { present: boolean; note: string };
-    officeHours: { present: boolean; note: string };
-    newPatientInfo: { present: boolean; note: string };
-    beforeAfter: { present: boolean; note: string };
-    blogContent: { present: boolean; note: string };
-    emergencyInfo: { present: boolean; note: string };
+    insuranceInfo: { present: boolean; quality: string; note: string };
+    officeHours: { present: boolean; quality: string; note: string };
+    newPatientInfo: { present: boolean; quality: string; note: string };
+    beforeAfter: { present: boolean; quality: string; note: string };
+    blogContent: { present: boolean; quality: string; note: string };
+    emergencyInfo: { present: boolean; quality: string; note: string };
     aboutPractice: { present: boolean; quality: string; note: string };
   };
   contentItemsPresentCount: number;
   criticalMissing: string[];
-  techStack: Array<{ name: string; version?: string; category: string }>;
-  technologyScore: number;
+
+  // Combined
+  issuesList: string[];
+  oneLineSummary: string;
+
+  // DOM checks
   hasContactForm: boolean;
   hasPhoneLink: boolean;
   hasEmailLink: boolean;
@@ -57,12 +67,16 @@ export interface IWebsiteAnalysis {
   hasGoogleMap: boolean;
   hasSocialLinks: boolean;
   hasSchemaMarkup: boolean;
-  imageCount: number;
   hasVideo: boolean;
+  imageCount: number;
   navigationItemCount: number;
-  overallScore: number;
-  issues: string[];
-  screenshots: { desktop: string; mobile: string };
+
+  // Screenshots (Cloudinary URLs)
+  screenshots: {
+    desktop: string;
+    mobile: string;
+  };
+
   analyzedAt: Date;
 }
 
@@ -109,6 +123,11 @@ export interface ILead extends Document {
   customWebsiteScreenshot?: string;
   emailHistory: IEmailHistoryEntry[];
   analyzed: boolean;
+  analysisStatus: 'pending' | 'queued' | 'processing' | 'completed' | 'failed';
+  analysisError?: string;
+  analysisGroupId?: string;
+  analyzedAt?: Date;
+  websiteQualityScore?: number;
   notes?: string;
   searchQuery: string;
   searchId: mongoose.Types.ObjectId;
@@ -151,28 +170,29 @@ const websiteAnalysisSchema = new Schema(
     bestPracticesScore: Number,
     loadTimeMs: Number,
     isHttps: Boolean,
-    hasViewportMeta: Boolean,
     coreWebVitals: {
       lcp: Number,
       cls: Number,
-      inp: Number,
+      tbt: Number,
     },
-    visualScore: Number,
-    designModernity: Number,
-    colorScheme: Number,
-    layoutQuality: Number,
-    imageQuality: Number,
-    ctaVisibility: Number,
-    trustSignals: Number,
-    mobileExperience: Number,
+    visualCategory: { type: String, enum: ['poor', 'fair', 'good', 'excellent'] },
+    visualSubScores: {
+      designModernity: { type: String, enum: ['poor', 'fair', 'good', 'excellent'] },
+      colorScheme: { type: String, enum: ['poor', 'fair', 'good', 'excellent'] },
+      layoutQuality: { type: String, enum: ['poor', 'fair', 'good', 'excellent'] },
+      imageQuality: { type: String, enum: ['poor', 'fair', 'good', 'excellent'] },
+      ctaVisibility: { type: String, enum: ['poor', 'fair', 'good', 'excellent'] },
+      trustSignals: { type: String, enum: ['poor', 'fair', 'good', 'excellent'] },
+      mobileExperience: { type: String, enum: ['poor', 'fair', 'good', 'excellent'] },
+    },
     designEraEstimate: String,
     visualIssues: [String],
-    contentScore: Number,
+    contentCategory: { type: String, enum: ['poor', 'fair', 'good', 'excellent'] },
     contentItems: Schema.Types.Mixed,
     contentItemsPresentCount: Number,
     criticalMissing: [String],
-    techStack: [{ name: String, version: String, category: String }],
-    technologyScore: Number,
+    issuesList: [String],
+    oneLineSummary: String,
     hasContactForm: Boolean,
     hasPhoneLink: Boolean,
     hasEmailLink: Boolean,
@@ -180,11 +200,9 @@ const websiteAnalysisSchema = new Schema(
     hasGoogleMap: Boolean,
     hasSocialLinks: Boolean,
     hasSchemaMarkup: Boolean,
-    imageCount: Number,
     hasVideo: Boolean,
+    imageCount: Number,
     navigationItemCount: Number,
-    overallScore: Number,
-    issues: [String],
     screenshots: { desktop: String, mobile: String },
     analyzedAt: Date,
   },
@@ -240,6 +258,15 @@ const leadSchema = new Schema<ILead>(
     customWebsiteScreenshot: { type: String },
     emailHistory: [emailHistorySchema],
     analyzed: { type: Boolean, default: false },
+    analysisStatus: {
+      type: String,
+      enum: ['pending', 'queued', 'processing', 'completed', 'failed'],
+      default: 'pending',
+    },
+    analysisError: { type: String },
+    analysisGroupId: { type: String },
+    analyzedAt: { type: Date },
+    websiteQualityScore: { type: Number },
     notes: { type: String },
     searchQuery: { type: String, required: true },
     searchId: { type: Schema.Types.ObjectId, ref: "SearchHistory", required: true },
@@ -252,5 +279,8 @@ leadSchema.index({ leadScore: -1 });
 leadSchema.index({ googleRating: -1 });
 leadSchema.index({ status: 1 });
 leadSchema.index({ analyzed: 1 });
+leadSchema.index({ analysisStatus: 1 });
+leadSchema.index({ analysisGroupId: 1 });
+leadSchema.index({ websiteQualityScore: -1 });
 
 export default mongoose.model<ILead>("Lead", leadSchema);

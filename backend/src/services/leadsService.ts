@@ -59,16 +59,15 @@ export async function getLeads(filters: LeadFilters) {
         maxWebsiteScore;
   }
 
-  const sortField =
-    sortBy === "leadScore"
-      ? "leadScore"
-      : sortBy === "googleRating"
-        ? "googleRating"
-        : sortBy === "googleReviewCount"
-          ? "googleReviewCount"
-          : sortBy === "websiteScore"
-            ? "websiteAnalysis.overallScore"
-            : "createdAt";
+  const sortFieldMap: Record<string, string> = {
+    leadScore: "leadScore",
+    websiteQualityScore: "websiteQualityScore",
+    googleRating: "googleRating",
+    googleReviewCount: "googleReviewCount",
+    analyzedAt: "analyzedAt",
+    createdAt: "createdAt",
+  };
+  const sortField = sortFieldMap[sortBy] || "createdAt";
 
   const skip = (page - 1) * limit;
   const total = await Lead.countDocuments(query);

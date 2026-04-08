@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -16,9 +16,11 @@ import {
   Loader2,
   ClipboardCheck,
   Calendar,
+  AlertCircle,
+  RotateCcw,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useLeadsStore } from "../../store/leadsStore";
+import { useLeadsStore, AnalysisStatus } from "../../store/leadsStore";
 
 const statusConfig: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   discovered: { bg: "bg-[#F5F1EB]", text: "text-[#3D5347]", dot: "bg-[#8A9590]", label: "Discovered" },
@@ -45,11 +47,16 @@ function timeAgo(dateStr: string) {
 }
 
 export default function AnalyzeLeadsPage() {
-  const { leads, total, page, totalPages, loading, fetchLeads, bulkAnalyzeLeads } = useLeadsStore();
+  const {
+    leads, total, page, totalPages, loading, fetchLeads, refreshLeads,
+    startAnalysis, getAnalysisStatus, retryFailedAnalysis, cancelAnalysis,
+    activeGroupId, analysisProgress: progress, setActiveGroup, restoreActiveGroup,
+  } = useLeadsStore();
   const [mounted, setMounted] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [analyzing, setAnalyzing] = useState(false);
+
+  const analyzing = !!activeGroupId;
 
   const [filters, setFilters] = useState({
     page: 1,
@@ -62,15 +69,56 @@ export default function AnalyzeLeadsPage() {
     sortOrder: "desc" as "asc" | "desc",
   });
 
+  // Keep a ref to filters so polling always uses the latest value
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+
   useEffect(() => {
     fetchLeads(filters);
     setSelected(new Set());
   }, [filters]);
 
+  // On mount: restore active group from localStorage (survives refresh)
   useEffect(() => {
+    restoreActiveGroup().then(() => {
+      // After restore, refresh leads in case analysis completed while away
+      fetchLeads(filtersRef.current);
+    });
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
   }, []);
+
+  // When activeGroupId clears (analysis done), refresh the list
+  const prevGroupId = useRef(activeGroupId);
+  useEffect(() => {
+    if (prevGroupId.current && !activeGroupId) {
+      // Group just finished — refresh to remove analyzed leads from the list
+      fetchLeads(filtersRef.current);
+    }
+    prevGroupId.current = activeGroupId;
+  }, [activeGroupId]);
+
+  // Poll for analysis progress
+  useEffect(() => {
+    if (!activeGroupId) return;
+    const interval = setInterval(async () => {
+      const status = await getAnalysisStatus(activeGroupId);
+      if (!status) return;
+      setActiveGroup(activeGroupId, status);
+      if (status.status === "completed" || status.status === "cancelled") {
+        clearInterval(interval);
+        setActiveGroup(null);
+        if (status.failed > 0) {
+          toast.error(`Analysis done: ${status.completed} completed, ${status.failed} failed`);
+        } else {
+          toast.success(`Analysis complete: ${status.completed} websites analyzed`);
+        }
+      } else {
+        refreshLeads(filtersRef.current);
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeGroupId]);
 
   const handleFilterChange = (key: string, value: string | number) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
@@ -97,30 +145,40 @@ export default function AnalyzeLeadsPage() {
 
   const handleAnalyze = async () => {
     if (selected.size === 0) return;
-    setAnalyzing(true);
-    const count = await bulkAnalyzeLeads(Array.from(selected));
-    if (count > 0) {
-      toast.success(`${count} lead${count > 1 ? "s" : ""} marked as analyzed`);
+    const result = await startAnalysis(Array.from(selected));
+    if (result) {
+      toast.success(`Analyzing ${result.totalJobs} website${result.totalJobs > 1 ? "s" : ""}...`);
+      setSelected(new Set());
     } else {
-      toast.error("Failed to analyze leads");
+      toast.error("Failed to start analysis");
     }
-    setSelected(new Set());
-    setAnalyzing(false);
-    fetchLeads(filters);
   };
 
   const handleAnalyzeAll = async () => {
     if (leads.length === 0) return;
-    const allIds = leads.map((l) => l._id);
-    setAnalyzing(true);
-    const count = await bulkAnalyzeLeads(allIds);
-    if (count > 0) {
-      toast.success(`${count} lead${count > 1 ? "s" : ""} marked as analyzed`);
+    const result = await startAnalysis(leads.map((l) => l._id));
+    if (result) {
+      toast.success(`Analyzing ${result.totalJobs} website${result.totalJobs > 1 ? "s" : ""}...`);
+      setSelected(new Set());
     } else {
-      toast.error("Failed to analyze leads");
+      toast.error("Failed to start analysis");
     }
-    setSelected(new Set());
-    setAnalyzing(false);
+  };
+
+  const handleRetry = async () => {
+    if (!activeGroupId && !progress?.groupId) return;
+    const gid = activeGroupId || progress!.groupId;
+    const count = await retryFailedAnalysis(gid);
+    if (count > 0) {
+      setActiveGroup(gid);
+      toast.success(`Retrying ${count} failed analysis${count > 1 ? "es" : ""}...`);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!activeGroupId) return;
+    await cancelAnalysis(activeGroupId);
+    toast.success("Analysis cancelled");
     fetchLeads(filters);
   };
 
@@ -189,8 +247,56 @@ export default function AnalyzeLeadsPage() {
         </div>
       </div>
 
+      {/* Analysis Progress Banner */}
+      {progress && analyzing && (
+        <div className="mb-4 bg-white rounded-xs border border-[#3D8B5E]/30 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+          <div className="px-5 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin text-[#3D8B5E]" />
+                <span className="text-sm font-semibold text-[#1A2E22]">
+                  Analyzing websites... {progress.completed} of {progress.total} completed
+                  {progress.failed > 0 && (
+                    <span className="text-[#C75555] ml-1">({progress.failed} failed)</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {progress.failed > 0 && (
+                  <button
+                    onClick={handleRetry}
+                    className="text-xs font-medium text-[#C47A4A] px-2.5 py-1 rounded-xs hover:bg-[#C47A4A]/10 transition flex items-center gap-1"
+                  >
+                    <RotateCcw size={12} />
+                    Retry Failed
+                  </button>
+                )}
+                <button
+                  onClick={handleCancel}
+                  className="text-xs font-medium text-[#C75555] px-2.5 py-1 rounded-xs hover:bg-[#C75555]/10 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+            <div className="w-full bg-[#E8E2D8] rounded-full h-2">
+              <div
+                className="bg-[#3D8B5E] h-2 rounded-full transition-all duration-500"
+                style={{ width: `${progress.total > 0 ? ((progress.completed + progress.failed) / progress.total) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="flex items-center gap-4 mt-2 text-[10px] font-medium text-[#8A9590] uppercase tracking-wider">
+              <span>{progress.waiting} waiting</span>
+              <span>{progress.inProgress} processing</span>
+              <span className="text-[#3D8B5E]">{progress.completed} done</span>
+              {progress.failed > 0 && <span className="text-[#C75555]">{progress.failed} failed</span>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bulk Actions Bar */}
-      {selected.size > 0 && (
+      {selected.size > 0 && !analyzing && (
         <div className="mb-4 bg-[#2A4A3A] rounded-xs px-5 py-3 flex items-center justify-between animate-[fadeIn_0.15s_ease-out]">
           <div className="flex items-center gap-3">
             <button onClick={() => setSelected(new Set())} className="text-white/60 hover:text-white transition">
@@ -205,12 +311,8 @@ export default function AnalyzeLeadsPage() {
             disabled={analyzing}
             className="px-4 py-1.5 rounded-xs text-xs font-semibold bg-white text-[#2A4A3A] hover:bg-white/90 transition flex items-center gap-2 disabled:opacity-50"
           >
-            {analyzing ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <ClipboardCheck size={12} />
-            )}
-            Mark as Analyzed
+            <ClipboardCheck size={12} />
+            Analyze Websites
           </button>
         </div>
       )}
@@ -390,11 +492,28 @@ export default function AnalyzeLeadsPage() {
                           </div>
                         )}
 
-                        {/* Status Badge */}
-                        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-xs text-[10px] font-semibold shrink-0 ${status.bg} ${status.text}`}>
-                          <div className={`w-1 h-1 rounded-full ${status.dot}`} />
-                          {status.label}
-                        </div>
+                        {/* Analysis Status Badge */}
+                        {lead.analysisStatus === "processing" ? (
+                          <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-xs text-[10px] font-semibold shrink-0 bg-[#3D8B5E]/10 text-[#2D7A4E]">
+                            <Loader2 size={10} className="animate-spin" />
+                            Analyzing...
+                          </div>
+                        ) : lead.analysisStatus === "queued" ? (
+                          <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-xs text-[10px] font-semibold shrink-0 bg-[#F5F1EB] text-[#8A9590]">
+                            <div className="w-1 h-1 rounded-full bg-[#8A9590]" />
+                            Queued
+                          </div>
+                        ) : lead.analysisStatus === "failed" ? (
+                          <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-xs text-[10px] font-semibold shrink-0 bg-[#C75555]/10 text-[#C75555]">
+                            <AlertCircle size={10} />
+                            Failed
+                          </div>
+                        ) : (
+                          <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-xs text-[10px] font-semibold shrink-0 ${status.bg} ${status.text}`}>
+                            <div className={`w-1 h-1 rounded-full ${status.dot}`} />
+                            {status.label}
+                          </div>
+                        )}
 
                         {/* Website link */}
                         <a
