@@ -138,6 +138,7 @@ interface LeadsStore {
   cancelAnalysis: (groupId: string) => Promise<number>;
   setActiveGroup: (groupId: string | null, progress?: AnalysisStatus | null) => void;
   restoreActiveGroup: () => Promise<void>;
+  exportLeads: (params: Record<string, string | number | undefined>, format: "csv" | "xlsx" | "json", selectedIds?: string[]) => Promise<boolean>;
 }
 
 export const useLeadsStore = create<LeadsStore>((set, get) => ({
@@ -404,15 +405,53 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
       }
       const status = data as AnalysisStatus;
       if (status.status === "completed" || status.status === "cancelled") {
-        // Already done — clear it
         localStorage.removeItem("analysisGroupId");
         set({ activeGroupId: null, analysisProgress: null });
       } else {
-        // Still running — restore polling state
         set({ activeGroupId: savedGroupId, analysisProgress: status });
       }
     } catch {
       localStorage.removeItem("analysisGroupId");
+    }
+  },
+
+  exportLeads: async (params, format, selectedIds) => {
+    try {
+      const query = new URLSearchParams();
+      query.set("format", format);
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== "" && k !== "page" && k !== "limit") query.set(k, String(v));
+      });
+      if (selectedIds && selectedIds.length > 0) {
+        query.set("ids", selectedIds.join(","));
+      }
+
+      const token = localStorage.getItem("token");
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+      const res = await fetch(`${API_URL}/leads/export?${query}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) return false;
+
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+      const filename = filenameMatch ? filenameMatch[1] : `leads-export.${format}`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return true;
+    } catch {
+      return false;
     }
   },
 }));
