@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -19,6 +19,11 @@ import {
   Square,
   MinusSquare,
   X,
+  Download,
+  FileSpreadsheet,
+  FileJson,
+  FileText,
+  Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useLeadsStore } from "../../store/leadsStore";
@@ -55,12 +60,15 @@ function timeAgo(dateStr: string) {
 }
 
 export default function LeadsPage() {
-  const { leads, total, page, totalPages, loading, stats, fetchLeads, fetchDashboardStats, deleteLead, bulkDeleteLeads, bulkUpdateStatus } = useLeadsStore();
+  const { leads, total, page, totalPages, loading, stats, fetchLeads, fetchDashboardStats, deleteLead, bulkDeleteLeads, bulkUpdateStatus, exportLeads } = useLeadsStore();
   const [mounted, setMounted] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const exportBtnRef = useRef<HTMLButtonElement>(null);
 
   const [filters, setFilters] = useState({
     page: 1,
@@ -142,6 +150,19 @@ export default function LeadsPage() {
     fetchLeads(filters);
   };
 
+  const handleExport = async (format: "csv" | "xlsx" | "json") => {
+    setExporting(true);
+    setShowExportMenu(false);
+    const selectedIds = selected.size > 0 ? Array.from(selected) : undefined;
+    const success = await exportLeads(filters, format, selectedIds);
+    if (success) {
+      toast.success(`${selected.size > 0 ? selected.size + " leads" : "All leads"} exported as ${format.toUpperCase()}`);
+    } else {
+      toast.error("Export failed. No matching leads found.");
+    }
+    setExporting(false);
+  };
+
   const activeFilterCount = [filters.status, filters.city, filters.search].filter(Boolean).length;
   const cats = stats?.categories || { hot: 0, warm: 0, cool: 0, skip: 0 };
   const allSelected = leads.length > 0 && selected.size === leads.length;
@@ -196,30 +217,47 @@ export default function LeadsPage() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="grid grid-cols-3 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-2.5">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 py-2.5 rounded-xs font-medium text-sm border transition-all duration-200 flex items-center gap-2 ${
+            className={`px-3 sm:px-4 py-2.5 rounded-xs font-medium text-sm border transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 ${
               showFilters || activeFilterCount > 0
                 ? "border-[#3D8B5E] bg-[#3D8B5E]/5 text-[#2D7A4E]"
                 : "border-[#CCC7BE] bg-white text-[#3D5347] hover:border-[#CCC8C0]"
             }`}
           >
-            <SlidersHorizontal size={15} />
-            Filters
+            <SlidersHorizontal size={15} className="shrink-0" />
+            <span className="truncate">Filters</span>
             {activeFilterCount > 0 && (
-              <span className="w-5 h-5 rounded-full bg-[#3D8B5E] text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="w-5 h-5 rounded-full bg-[#3D8B5E] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
                 {activeFilterCount}
               </span>
             )}
           </button>
+
+          {/* Export Button */}
+          <button
+            ref={exportBtnRef}
+            onClick={() => setShowExportMenu(!showExportMenu)}
+            disabled={exporting || total === 0}
+            className="px-3 sm:px-4 py-2.5 rounded-xs font-medium text-sm border border-[#CCC7BE] bg-white text-[#3D5347] hover:border-[#CCC8C0] transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {exporting ? <Loader2 size={15} className="animate-spin shrink-0" /> : <Download size={15} className="shrink-0" />}
+            <span className="truncate">Export</span>
+            {selected.size > 0 && (
+              <span className="w-5 h-5 rounded-full bg-[#2A4A3A] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                {selected.size}
+              </span>
+            )}
+          </button>
+
           <Link
             href="/dashboard/search"
-            className="px-5 py-2.5 rounded-xs font-semibold text-white text-sm transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
+            className="px-3 sm:px-5 py-2.5 rounded-xs font-semibold text-white text-sm transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1.5 sm:gap-2"
             style={{ backgroundColor: "#2A4A3A" }}
           >
-            <Search size={16} strokeWidth={2.5} />
-            Search New
+            <Search size={16} strokeWidth={2.5} className="shrink-0" />
+            <span className="truncate">Search New</span>
           </Link>
         </div>
       </div>
@@ -687,10 +725,101 @@ export default function LeadsPage() {
         )}
       </div>
 
+      {/* Export Dropdown — bottom sheet on mobile, positioned dropdown on sm+ */}
+      {showExportMenu && (() => {
+        const rect = exportBtnRef.current?.getBoundingClientRect();
+        const isSmUp = typeof window !== "undefined" && window.innerWidth >= 640;
+        return (
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 sm:bg-transparent bg-black/30"
+              style={{ zIndex: 9998 }}
+              onClick={() => setShowExportMenu(false)}
+            />
+            {/* Menu */}
+            <div
+              className="fixed inset-x-0 bottom-0 sm:inset-auto sm:w-56 bg-white rounded-t-2xl sm:rounded-t-xs sm:rounded-b-xs border-t sm:border border-[#D8D2C8] shadow-xl animate-[slideUp_0.2s_ease-out] sm:animate-[fadeIn_0.12s_ease-out]"
+              style={{
+                zIndex: 9999,
+                ...(isSmUp && rect
+                  ? { top: rect.bottom + 6, left: Math.max(8, rect.right - 224) }
+                  : {}),
+              }}
+            >
+              {/* Drag handle — mobile only */}
+              <div className="sm:hidden flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-[#D8D2C8]" />
+              </div>
+
+              <div className="px-4 sm:px-3 py-2.5 sm:py-2 border-b border-[#EDE8E0] flex items-center justify-between">
+                <p className="text-xs sm:text-[10px] font-semibold uppercase tracking-wider text-[#8A9590]">
+                  {selected.size > 0 ? `Export ${selected.size} selected` : `Export all ${total} leads`}
+                </p>
+                <button onClick={() => setShowExportMenu(false)} className="sm:hidden p-1 text-[#8A9590] hover:text-[#1A2E22] transition">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="py-1 sm:py-1">
+                <button
+                  onClick={() => handleExport("csv")}
+                  className="w-full flex items-center gap-3 px-4 sm:px-3 py-3.5 sm:py-2.5 text-sm text-[#1A2E22] hover:bg-[#FAF8F5] active:bg-[#F0EBE3] transition-colors"
+                >
+                  <div className="w-9 h-9 sm:w-auto sm:h-auto rounded-lg sm:rounded-none bg-[#3D8B5E]/10 sm:bg-transparent flex items-center justify-center">
+                    <FileText size={18} className="sm:!w-4 sm:!h-4 text-[#3D8B5E]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-[14px] sm:text-[13px]">CSV</p>
+                    <p className="text-[12px] sm:text-[11px] text-[#8A9590]">Spreadsheets, CRM import</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleExport("xlsx")}
+                  className="w-full flex items-center gap-3 px-4 sm:px-3 py-3.5 sm:py-2.5 text-sm text-[#1A2E22] hover:bg-[#FAF8F5] active:bg-[#F0EBE3] transition-colors"
+                >
+                  <div className="w-9 h-9 sm:w-auto sm:h-auto rounded-lg sm:rounded-none bg-[#2D7A4E]/10 sm:bg-transparent flex items-center justify-center">
+                    <FileSpreadsheet size={18} className="sm:!w-4 sm:!h-4 text-[#2D7A4E]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-[14px] sm:text-[13px]">Excel (.xlsx)</p>
+                    <p className="text-[12px] sm:text-[11px] text-[#8A9590]">Formatted with column widths</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleExport("json")}
+                  className="w-full flex items-center gap-3 px-4 sm:px-3 py-3.5 sm:py-2.5 text-sm text-[#1A2E22] hover:bg-[#FAF8F5] active:bg-[#F0EBE3] transition-colors"
+                >
+                  <div className="w-9 h-9 sm:w-auto sm:h-auto rounded-lg sm:rounded-none bg-[#C47A4A]/10 sm:bg-transparent flex items-center justify-center">
+                    <FileJson size={18} className="sm:!w-4 sm:!h-4 text-[#C47A4A]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-[14px] sm:text-[13px]">JSON</p>
+                    <p className="text-[12px] sm:text-[11px] text-[#8A9590]">API integrations, developers</p>
+                  </div>
+                </button>
+              </div>
+              {(activeFilterCount > 0 || filters.category) && (
+                <div className="px-4 sm:px-3 py-2.5 sm:py-2 border-t border-[#EDE8E0]">
+                  <p className="text-[11px] sm:text-[10px] text-[#8A9590]">
+                    Active filters will be applied to export
+                  </p>
+                </div>
+              )}
+              {/* Safe area padding for phones with home indicator */}
+              <div className="sm:hidden h-[env(safe-area-inset-bottom,8px)]" />
+            </div>
+          </>
+        );
+      })()}
+
       <style jsx global>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(4px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
         }
       `}</style>
     </div>

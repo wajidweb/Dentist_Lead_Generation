@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useLeadsStore } from "../../../store/leadsStore";
+import { useEmailOutreachStore } from "../../../store/emailOutreachStore";
+import { EmailPreviewModal } from "../../../components/EmailPreviewModal";
+import { EmailTrackingTab } from "../../../components/EmailTrackingTab";
 import {
   ChevronLeft,
   MapPin,
@@ -20,6 +23,7 @@ import {
   MessageSquare,
   AlertCircle,
   Zap,
+  Send,
 } from "lucide-react";
 
 const pipelineSteps = [
@@ -46,6 +50,7 @@ export default function LeadDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { currentLead: lead, detailLoading, fetchLeadDetail, updateLeadStatus, clearCurrentLead } = useLeadsStore();
+  const { openPreviewModal } = useEmailOutreachStore();
   const [mounted, setMounted] = useState(false);
 
   const id = params.id as string;
@@ -92,8 +97,16 @@ export default function LeadDetailPage() {
     );
   }
 
+  const canSendOutreach =
+    lead?.email &&
+    lead?.analyzed &&
+    lead?.status !== "email_sent" &&
+    lead?.status !== "replied" &&
+    lead?.status !== "converted";
+
   return (
     <div className="max-w-[1200px] mx-auto">
+      <EmailPreviewModal />
       {/* Back Button */}
       <button
         onClick={() => router.back()}
@@ -488,8 +501,41 @@ export default function LeadDetailPage() {
                     </button>
                   )
                 )}
+              {/* Send Outreach button */}
+              <div className="px-2 pt-2 pb-1">
+                <button
+                  onClick={() => openPreviewModal(lead._id)}
+                  disabled={!canSendOutreach}
+                  title={
+                    !lead.email
+                      ? "No email address available"
+                      : !lead.analyzed
+                      ? "Lead must be analyzed first"
+                      : !canSendOutreach
+                      ? "Outreach already sent"
+                      : "Send email outreach"
+                  }
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xs text-sm font-semibold text-white bg-[#2A4A3A] hover:bg-[#1E3A2E] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Send size={14} />
+                  Send Outreach
+                </button>
+                {!lead.email && (
+                  <p className="text-[10px] text-[#C75555] text-center mt-1.5">
+                    No email address found
+                  </p>
+                )}
+                {lead.email && !lead.analyzed && (
+                  <p className="text-[10px] text-[#C47A4A] text-center mt-1.5">
+                    Analyze lead to unlock
+                  </p>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Email Tracking */}
+          <EmailTrackingTab leadId={lead._id} />
 
           {/* Info */}
           <div className="bg-white rounded-xs border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
@@ -501,7 +547,7 @@ export default function LeadDetailPage() {
                 { label: "Added", value: new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), icon: <Calendar size={13} /> },
                 { label: "Updated", value: new Date(lead.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), icon: <Calendar size={13} /> },
                 lead.leadScore !== undefined ? { label: "Lead Score", value: `${lead.leadScore} / 100`, icon: <TrendingUp size={13} /> } : null,
-                lead.emailSource ? { label: "Email Source", value: lead.emailSource, icon: <Mail size={13} /> } : null,
+                lead.emailSource ? { label: "Email Source", value: lead.emailSource === "domain-search" ? "Domain Search (SMTP)" : lead.emailSource === "scrape" ? "Website Scrape" : lead.emailSource.charAt(0).toUpperCase() + lead.emailSource.slice(1), icon: <Mail size={13} /> } : null,
                 { label: "Place ID", value: lead.googlePlaceId, icon: <Hash size={13} />, mono: true },
               ]
                 .filter(Boolean)

@@ -8,6 +8,7 @@ import {
   determineLeadCategory,
 } from "../services/scoreService";
 import { uploadScreenshots } from "../services/cloudinaryService";
+import { findEmailByDomain } from "../services/domainEmailService";
 import Lead from "../models/Lead";
 import AnalysisGroup from "../models/AnalysisGroup";
 
@@ -114,11 +115,32 @@ async function processJob(job: Job<AnalysisJobData>) {
     status: "analyzed",
   };
 
-  // Save scraped email if found and lead doesn't already have one
-  if (puppeteerResult.emails.length > 0 && !lead.email) {
-    updateData.email = puppeteerResult.emails[0]; // Best match (sorted: branded domain first, then info@/office@/contact@)
-    updateData.emailSource = "scrape";
-    console.log(`${tag} Email saved: ${puppeteerResult.emails[0]}`);
+  // Save email — try website scraping first, then domain search fallback
+  if (!lead.email) {
+    if (puppeteerResult.emails.length > 0) {
+      updateData.email = puppeteerResult.emails[0];
+      updateData.emailSource = "scrape";
+      console.log(`${tag} Email found via scraping: ${puppeteerResult.emails[0]}`);
+    } else {
+      // Fallback: find email by domain (MX lookup + SMTP verification)
+      console.log(`${tag} No email on website — trying domain search...`);
+      try {
+        const domainResult = await findEmailByDomain(websiteUrl);
+        if (domainResult.email) {
+          updateData.email = domainResult.email;
+          updateData.emailSource = "domain-search";
+          if (domainResult.method === "smtp-verified") {
+            updateData.emailVerified = true;
+            updateData.emailVerificationStatus = "deliverable";
+          }
+          console.log(`${tag} Email found via domain search: ${domainResult.email} (${domainResult.method}, tested ${domainResult.candidatesTested} candidates)`);
+        } else {
+          console.log(`${tag} No email found via domain search (tested ${domainResult.candidatesTested} candidates)`);
+        }
+      } catch (err) {
+        console.log(`${tag} Domain email search failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
   }
 
   await Lead.findByIdAndUpdate(leadId, updateData);

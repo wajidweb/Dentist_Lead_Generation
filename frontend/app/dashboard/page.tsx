@@ -34,6 +34,8 @@ import {
   Target,
   Zap,
 } from "lucide-react";
+import { useEmailOutreachStore } from "../store/emailOutreachStore";
+import { OutreachStatsCard } from "../components/OutreachStatsCard";
 
 /* ─── Animated counter hook ─── */
 function useCountUp(target: number, duration = 800) {
@@ -114,11 +116,13 @@ const PIPELINE_COLORS = [
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const { stats, statsLoading, fetchDashboardStats } = useLeadsStore();
+  const { fetchOutreachStats } = useEmailOutreachStore();
   const [mounted, setMounted] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<{ name: string; value: number; color: string } | null>(null);
 
   useEffect(() => {
     fetchDashboardStats();
+    fetchOutreachStats();
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
   }, []);
@@ -318,6 +322,15 @@ export default function DashboardPage() {
           </div>
           <p className="text-[11px] text-[#8A9590] mt-0.5">{converted} of {emailSent} emailed</p>
         </div>
+      </div>
+
+      {/* ── Outreach Stats ── */}
+      <div
+        className={`mb-4 transition-all duration-500 delay-100 ${
+          mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
+        }`}
+      >
+        <OutreachStatsCard />
       </div>
 
       {/* ── Pipeline Funnel + Donut ── */}

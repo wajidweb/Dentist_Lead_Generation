@@ -10,12 +10,14 @@ import {
   bulkRemove,
   bulkChangeStatus,
   bulkAnalyze,
+  exportLeads,
 } from "../controllers/leadsController";
 
 const router = Router();
 
 router.get("/", authMiddleware, list);
 router.get("/stats", authMiddleware, stats);
+router.get("/export", authMiddleware, exportLeads);
 router.post("/bulk-delete", authMiddleware, bulkRemove);
 router.post("/bulk-status", authMiddleware, bulkChangeStatus);
 router.post("/bulk-analyze", authMiddleware, bulkAnalyze);
