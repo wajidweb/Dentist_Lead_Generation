@@ -87,6 +87,10 @@ export interface IEmailHistoryEntry {
   body: string;
   status: "sent" | "opened" | "replied" | "bounced";
   instantlyEmailId?: string;
+  sequenceStep?: number;
+  openedAt?: Date;
+  repliedAt?: Date;
+  bouncedAt?: Date;
 }
 
 export interface ILead extends Document {
@@ -129,6 +133,10 @@ export interface ILead extends Document {
   analyzedAt?: Date;
   websiteQualityScore?: number;
   notes?: string;
+  instantlyCampaignId?: string;
+  instantlyLeadId?: string;
+  outreachStatus?: "pending" | "sent" | "opened" | "replied" | "bounced";
+  lastOutreachAt?: Date;
   searchQuery: string;
   searchId: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -158,6 +166,10 @@ const emailHistorySchema = new Schema<IEmailHistoryEntry>(
       default: "sent",
     },
     instantlyEmailId: { type: String },
+    sequenceStep: { type: Number },
+    openedAt: { type: Date },
+    repliedAt: { type: Date },
+    bouncedAt: { type: Date },
   },
   { _id: false }
 );
@@ -268,6 +280,13 @@ const leadSchema = new Schema<ILead>(
     analyzedAt: { type: Date },
     websiteQualityScore: { type: Number },
     notes: { type: String },
+    instantlyCampaignId: { type: String },
+    instantlyLeadId: { type: String },
+    outreachStatus: {
+      type: String,
+      enum: ["pending", "sent", "opened", "replied", "bounced"],
+    },
+    lastOutreachAt: { type: Date },
     searchQuery: { type: String, required: true },
     searchId: { type: Schema.Types.ObjectId, ref: "SearchHistory", required: true },
   },

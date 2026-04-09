@@ -135,6 +135,34 @@ export async function bulkAnalyzeLeads(ids: string[]) {
   return result.modifiedCount;
 }
 
+export async function getOutreachAggregates(
+  startDate?: Date,
+  endDate?: Date
+): Promise<{
+  totalOutreachSent: number;
+  totalOpened: number;
+  totalReplied: number;
+  totalBounced: number;
+}> {
+  const dateFilter =
+    startDate && endDate
+      ? { lastOutreachAt: { $gte: startDate, $lte: endDate } }
+      : {};
+
+  const [totalOutreachSent, totalOpened, totalReplied, totalBounced] =
+    await Promise.all([
+      Lead.countDocuments({
+        outreachStatus: { $in: ["sent", "opened", "replied", "bounced"] },
+        ...dateFilter,
+      }),
+      Lead.countDocuments({ outreachStatus: "opened", ...dateFilter }),
+      Lead.countDocuments({ outreachStatus: "replied", ...dateFilter }),
+      Lead.countDocuments({ outreachStatus: "bounced", ...dateFilter }),
+    ]);
+
+  return { totalOutreachSent, totalOpened, totalReplied, totalBounced };
+}
+
 export async function getDashboardStats(startDate?: Date, endDate?: Date) {
   const dateFilter = startDate && endDate
     ? { createdAt: { $gte: startDate, $lte: endDate } }

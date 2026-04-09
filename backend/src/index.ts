@@ -6,6 +6,10 @@ import authRoutes from "./routes/authRoutes";
 import searchRoutes from "./routes/searchRoutes";
 import leadsRoutes from "./routes/leadsRoutes";
 import analysisRoutes from "./routes/analysisRoutes";
+import emailOutreachRoutes from "./routes/emailOutreachRoutes";
+import settingsRoutes from "./routes/settingsRoutes";
+import uniboxRoutes from "./routes/uniboxRoutes";
+import webhookRoutes from "./routes/webhookRoutes";
 import { startAnalysisWorker, stopAnalysisWorker } from "./jobs/analysisWorker";
 
 dotenv.config();
@@ -21,12 +25,21 @@ app.use(
     credentials: true,
   })
 );
+
+// Webhook routes must be registered BEFORE express.json() so the raw body
+// middleware in webhookRoutes can capture the raw request stream for HMAC
+// signature verification.
+app.use("/api/webhooks", webhookRoutes);
+
 app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/leads", leadsRoutes);
 app.use("/api/analysis", analysisRoutes);
+app.use("/api/email-outreach", emailOutreachRoutes);
+app.use("/api/settings", settingsRoutes);
+app.use("/api/unibox", uniboxRoutes);
 app.get("/", (_req, res) => {
   res.json({ message: "DentalLeads API" });
 });

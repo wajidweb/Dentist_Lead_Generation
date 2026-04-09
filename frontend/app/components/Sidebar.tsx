@@ -13,6 +13,9 @@ import {
   ClipboardCheck,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings,
+  Zap,
+  Inbox,
 } from "lucide-react";
 
 const menuItems = [
@@ -20,7 +23,10 @@ const menuItems = [
   { label: "Search",        href: "/dashboard/search",        icon: <Search size={20} /> },
   { label: "Analyze Leads", href: "/dashboard/analyze-leads", icon: <ClipboardCheck size={20} /> },
   { label: "Leads",         href: "/dashboard/leads",         icon: <Users size={20} /> },
+  { label: "Campaigns",     href: "/dashboard/campaigns",     icon: <Zap size={20} /> },
+  { label: "Unibox",        href: "/dashboard/unibox",        icon: <Inbox size={20} /> },
   { label: "Analytics",     href: "/dashboard/analytics",     icon: <BarChart3 size={20} /> },
+  { label: "Settings",      href: "/dashboard/settings",      icon: <Settings size={20} /> },
 ];
 
 interface SidebarProps {
