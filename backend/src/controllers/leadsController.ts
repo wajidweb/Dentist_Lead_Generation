@@ -9,6 +9,8 @@ import {
   bulkDeleteLeads,
   bulkUpdateLeadStatus,
   bulkAnalyzeLeads,
+  getLeadsForExport,
+  generateExportFile,
 } from "../services/leadsService";
 
 export const list = async (req: Request, res: Response) => {
@@ -179,5 +181,70 @@ export const bulkAnalyze = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Bulk analyze error:", error);
     res.status(500).json({ message: "Failed to analyze leads" });
+  }
+};
+
+export const exportLeads = async (req: Request, res: Response) => {
+  try {
+    const format = (req.query.format as string) || "csv";
+    if (!["csv", "xlsx", "json"].includes(format)) {
+      res.status(400).json({ message: "Invalid format. Use csv, xlsx, or json." });
+      return;
+    }
+
+    // Parse selected IDs if provided
+    const idsParam = req.query.ids as string | undefined;
+    const ids = idsParam ? idsParam.split(",").filter(Boolean) : undefined;
+
+    const filters = {
+      status: req.query.status as string,
+      category: req.query.category as string,
+      city: req.query.city as string,
+      analyzed: req.query.analyzed !== undefined
+        ? req.query.analyzed === "true"
+        : undefined,
+      minLeadScore: req.query.minLeadScore
+        ? Number(req.query.minLeadScore)
+        : undefined,
+      maxLeadScore: req.query.maxLeadScore
+        ? Number(req.query.maxLeadScore)
+        : undefined,
+      minWebsiteScore: req.query.minWebsiteScore
+        ? Number(req.query.minWebsiteScore)
+        : undefined,
+      maxWebsiteScore: req.query.maxWebsiteScore
+        ? Number(req.query.maxWebsiteScore)
+        : undefined,
+      sortBy: (req.query.sortBy as string) || "createdAt",
+      sortOrder: (req.query.sortOrder as "asc" | "desc") || "desc",
+      search: req.query.search as string,
+    };
+
+    const leads = await getLeadsForExport(filters, ids);
+
+    if (leads.length === 0) {
+      res.status(404).json({ message: "No leads found matching the filters" });
+      return;
+    }
+
+    const { buffer, contentType, extension } = generateExportFile(
+      leads,
+      format as "csv" | "xlsx" | "json"
+    );
+
+    // Build filename with filter context
+    const parts = ["leads"];
+    if (filters.category) parts.push(filters.category);
+    if (filters.city) parts.push(filters.city.toLowerCase().replace(/\s+/g, "-"));
+    if (filters.status) parts.push(filters.status);
+    parts.push(new Date().toISOString().slice(0, 10));
+    const filename = `${parts.join("-")}.${extension}`;
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    console.error("Export leads error:", error);
+    res.status(500).json({ message: "Failed to export leads" });
   }
 };

@@ -103,7 +103,7 @@ export interface ILead extends Document {
   googleReviewCount: number;
   reviews: IReview[];
   email?: string;
-  emailSource?: "scrape" | "hunter" | "outscraper" | "manual";
+  emailSource?: "scrape" | "domain-search" | "hunter" | "outscraper" | "manual";
   emailVerified?: boolean;
   emailVerificationStatus?: "deliverable" | "risky" | "undeliverable";
   websiteAnalysis?: IWebsiteAnalysis;
@@ -226,7 +226,7 @@ const leadSchema = new Schema<ILead>(
     email: { type: String },
     emailSource: {
       type: String,
-      enum: ["scrape", "hunter", "outscraper", "manual"],
+      enum: ["scrape", "domain-search", "hunter", "outscraper", "manual"],
     },
     emailVerified: { type: Boolean },
     emailVerificationStatus: {

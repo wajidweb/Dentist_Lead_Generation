@@ -501,7 +501,7 @@ export default function LeadDetailPage() {
                 { label: "Added", value: new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), icon: <Calendar size={13} /> },
                 { label: "Updated", value: new Date(lead.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), icon: <Calendar size={13} /> },
                 lead.leadScore !== undefined ? { label: "Lead Score", value: `${lead.leadScore} / 100`, icon: <TrendingUp size={13} /> } : null,
-                lead.emailSource ? { label: "Email Source", value: lead.emailSource, icon: <Mail size={13} /> } : null,
+                lead.emailSource ? { label: "Email Source", value: lead.emailSource === "domain-search" ? "Domain Search (SMTP)" : lead.emailSource === "scrape" ? "Website Scrape" : lead.emailSource.charAt(0).toUpperCase() + lead.emailSource.slice(1), icon: <Mail size={13} /> } : null,
                 { label: "Place ID", value: lead.googlePlaceId, icon: <Hash size={13} />, mono: true },
               ]
                 .filter(Boolean)
