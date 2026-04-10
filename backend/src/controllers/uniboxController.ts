@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as instantlyService from "../services/instantlyService";
+import Campaign from "../models/Campaign";
 
 // Helper: normalize a raw Instantly email object to consistent field names
 function normalizeEmail(e: Record<string, unknown>): Record<string, unknown> {
@@ -53,45 +54,93 @@ export const listEmails = async (req: Request, res: Response): Promise<void> => 
     const { campaign_id, is_read, email_type, folder, search, limit, skip } = req.query;
 
     // Resolve email_type: only "sent" and "received" are valid for Instantly V2
-    // "others" folder uses the folder param only, NOT email_type
     let resolvedEmailType = email_type as string | undefined;
     if (!resolvedEmailType && folder) {
       if (folder === "primary") resolvedEmailType = "received";
-      // "others" folder — don't set email_type, just pass folder
     }
-    // Ensure email_type is only "sent" or "received"
     if (resolvedEmailType && resolvedEmailType !== "sent" && resolvedEmailType !== "received") {
       resolvedEmailType = undefined;
     }
 
-    const result = await instantlyService.listEmails({
-      campaign_id: campaign_id as string | undefined,
+    // Determine which campaign IDs to fetch emails for
+    let campaignIds: string[] = [];
+    if (campaign_id) {
+      // Specific campaign selected
+      campaignIds = [campaign_id as string];
+    } else {
+      // No campaign selected — only fetch from user's own campaigns
+      const userCampaigns = await Campaign.find({ userEmail }).select("instantlyCampaignId").lean();
+      campaignIds = userCampaigns
+        .map((c) => c.instantlyCampaignId)
+        .filter((id): id is string => !!id);
+    }
+
+    // If user has no campaigns, return empty
+    if (campaignIds.length === 0) {
+      res.json({ emails: [], total: 0 });
+      return;
+    }
+
+    const baseParams = {
       is_read: is_read === "true" ? true : is_read === "false" ? false : undefined,
       email_type: resolvedEmailType,
       folder: folder as string | undefined,
       search: search as string | undefined,
       limit: limit ? Number(limit) : 50,
       skip: skip ? Number(skip) : 0,
-    });
+    };
 
-    // Debug: log FULL raw Instantly response
-    console.log("[Unibox] RAW response type:", typeof result, Array.isArray(result) ? "array" : "object");
-    console.log("[Unibox] RAW response:", JSON.stringify(result).slice(0, 1500));
+    // Fetch emails from each campaign in parallel, then merge
+    const parseResult = (result: unknown): { emails: unknown[]; total: number } => {
+      let emails: unknown[] = [];
+      let total = 0;
+      if (Array.isArray(result)) {
+        emails = result;
+        total = result.length;
+      } else if (result && typeof result === "object") {
+        const obj = result as Record<string, unknown>;
+        emails = (obj.data ?? obj.items ?? obj.emails ?? []) as unknown[];
+        total = (obj.total ?? obj.count ?? emails.length) as number;
+      }
+      return { emails, total };
+    };
 
-    // Instantly may return array or { data: [], total: number }
-    let emails: unknown[] = [];
-    let total = 0;
-    if (Array.isArray(result)) {
-      emails = result;
-      total = result.length;
-    } else if (result && typeof result === "object") {
-      const obj = result as Record<string, unknown>;
-      emails = (obj.data ?? obj.items ?? obj.emails ?? []) as unknown[];
-      total = (obj.total ?? obj.count ?? emails.length) as number;
+    let allEmails: unknown[] = [];
+    let allTotal = 0;
+
+    if (campaignIds.length === 1) {
+      // Single campaign — simple fetch
+      const result = await instantlyService.listEmails({
+        ...baseParams,
+        campaign_id: campaignIds[0],
+      });
+      const parsed = parseResult(result);
+      allEmails = parsed.emails;
+      allTotal = parsed.total;
+    } else {
+      // Multiple campaigns — fetch in parallel and merge
+      const results = await Promise.all(
+        campaignIds.map((cid) =>
+          instantlyService.listEmails({ ...baseParams, campaign_id: cid }).catch(() => [])
+        )
+      );
+      for (const result of results) {
+        const parsed = parseResult(result);
+        allEmails.push(...parsed.emails);
+        allTotal += parsed.total;
+      }
+      // Sort merged emails by date (newest first)
+      allEmails.sort((a, b) => {
+        const ae = a as Record<string, unknown>;
+        const be = b as Record<string, unknown>;
+        const aTime = new Date((ae.sent_at ?? ae.timestamp_email ?? ae.timestamp_created ?? 0) as string).getTime();
+        const bTime = new Date((be.sent_at ?? be.timestamp_email ?? be.timestamp_created ?? 0) as string).getTime();
+        return bTime - aTime;
+      });
     }
 
-    const normalized = (emails as Record<string, unknown>[]).map(normalizeEmail);
-    res.json({ emails: normalized, total });
+    const normalized = (allEmails as Record<string, unknown>[]).map(normalizeEmail);
+    res.json({ emails: normalized, total: allTotal });
   } catch (error) {
     console.error("List emails error:", error);
     const message = error instanceof Error ? error.message : "Failed to fetch emails";
@@ -212,32 +261,36 @@ export const getEmailThread = async (req: Request, res: Response): Promise<void>
     const threadMap = new Map<string, Record<string, unknown>>();
     threadMap.set(emailUuid, email);
 
-    // If there's a thread_id, fetch all emails in the same thread
-    if (threadId) {
-      try {
-        const threadResult = await instantlyService.listEmails({
-          limit: 50,
-          skip: 0,
-          search: threadId,
-        });
-        const threadEmails = (() => {
-          if (Array.isArray(threadResult)) return threadResult as Record<string, unknown>[];
-          if (threadResult && typeof threadResult === "object") {
-            const obj = threadResult as Record<string, unknown>;
-            return ((obj.data ?? obj.items ?? obj.emails ?? []) as Record<string, unknown>[]);
-          }
-          return [];
-        })();
-        for (const te of threadEmails) {
-          const id = (te.uuid ?? te.id ?? "") as string;
-          if (id && !threadMap.has(id)) threadMap.set(id, te);
-        }
-      } catch {
-        // continue with single email
-      }
-    }
+    // Determine contact email and base subject for strict filtering
+    const normalized0 = normalizeEmail(email);
+    const contactEmail = (
+      normalized0.email_type === "sent"
+        ? normalized0.to_address
+        : normalized0.from_address
+    ) as string | undefined;
+    const rawSubject = ((normalized0.subject as string) ?? "").trim();
+    const baseSubject = rawSubject.replace(/^(Re:\s*|Fwd:\s*|Fw:\s*)+/i, "").trim().toLowerCase();
 
-    // Also walk up via reply_to_uuid
+    // Helper: check if an email belongs to this conversation
+    const belongsToThread = (raw: Record<string, unknown>): boolean => {
+      const norm = normalizeEmail(raw);
+      // If the selected email has a thread_id, require matching thread_id
+      if (threadId) {
+        const candidateThreadId = (norm.thread_id as string | undefined);
+        if (candidateThreadId && candidateThreadId !== threadId) return false;
+      }
+      // Must involve the same contact email
+      const from = ((norm.from_address as string) ?? "").toLowerCase();
+      const to = ((norm.to_address as string) ?? "").toLowerCase();
+      const contact = (contactEmail ?? "").toLowerCase();
+      if (!contact || (from !== contact && to !== contact)) return false;
+      // Must have matching subject
+      const subj = ((norm.subject as string) ?? "").replace(/^(Re:\s*|Fwd:\s*|Fw:\s*)+/i, "").trim().toLowerCase();
+      if (baseSubject && subj !== baseSubject) return false;
+      return true;
+    };
+
+    // Strategy 1: Walk up via reply_to_uuid (most reliable)
     let current = email;
     let depth = 0;
     while ((current.reply_to_uuid as string) && depth < 10) {
@@ -254,6 +307,34 @@ export const getEmailThread = async (req: Request, res: Response): Promise<void>
         break;
       }
       depth++;
+    }
+
+    // Strategy 2: Search by contact email, strictly filtered by subject
+    if (threadMap.size <= 1 && contactEmail) {
+      try {
+        const searchResult = await instantlyService.listEmails({
+          limit: 50,
+          skip: 0,
+          search: contactEmail,
+        });
+        const searchEmails = (() => {
+          if (Array.isArray(searchResult)) return searchResult as Record<string, unknown>[];
+          if (searchResult && typeof searchResult === "object") {
+            const obj = searchResult as Record<string, unknown>;
+            return ((obj.data ?? obj.items ?? obj.emails ?? []) as Record<string, unknown>[]);
+          }
+          return [];
+        })();
+        for (const se of searchEmails) {
+          const id = (se.uuid ?? se.id ?? "") as string;
+          if (!id || threadMap.has(id)) continue;
+          if (belongsToThread(se)) {
+            threadMap.set(id, se);
+          }
+        }
+      } catch {
+        // continue with what we have
+      }
     }
 
     // Normalize and sort chronologically

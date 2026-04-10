@@ -842,14 +842,17 @@ export const campaignAnalytics = async (
     // Instantly returns an array — take the first element
     const rawResult = Array.isArray(result) ? result[0] : result;
     const raw = (rawResult ?? {}) as Record<string, unknown>;
-    console.log("[CampaignAnalytics] Raw Instantly response keys:", Object.keys(raw));
+    console.log("[CampaignAnalytics] Raw Instantly response — all fields:");
+    for (const [key, value] of Object.entries(raw)) {
+      console.log(`  ${key}: ${JSON.stringify(value)}`);
+    }
 
     // Try multiple field name formats — Instantly's response format varies
     const sent = Number(
       raw.emails_sent_count ?? raw.emails_sent ?? raw.sent ?? raw.sequence_started ?? campaign.emailsSent ?? 0
     );
     const opened = Number(
-      raw.unique_opens ?? raw.open_count ?? raw.opens ?? raw.opened ?? campaign.emailsOpened ?? 0
+      raw.open_count_unique ?? raw.unique_opens ?? raw.opens ?? raw.opened ?? campaign.emailsOpened ?? 0
     );
     const replied = Number(
       raw.reply_count ?? raw.replies ?? raw.replied ?? raw.total_replies ?? campaign.emailsReplied ?? 0

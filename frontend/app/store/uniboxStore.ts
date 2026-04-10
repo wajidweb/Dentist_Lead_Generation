@@ -187,7 +187,31 @@ export const useUniboxStore = create<UniboxStore>((set, get) => ({
           body,
         }),
       });
-      set({ replyLoading: false });
+      if (res.ok) {
+        // Optimistically add the sent reply to the thread immediately
+        const optimisticMessage: Email = {
+          id: `optimistic-${Date.now()}`,
+          uuid: `optimistic-${Date.now()}`,
+          from_address: fromEmail,
+          to_address: get().selectedEmail?.email_type === "sent"
+            ? get().selectedEmail?.to_address
+            : get().selectedEmail?.from_address,
+          subject,
+          body: `<p>${body.replace(/\n/g, "<br/>")}</p>`,
+          email_type: "sent",
+          is_read: true,
+          is_unread: false,
+          sent_at: new Date().toISOString(),
+          timestamp_created: new Date().toISOString(),
+          reply_to_uuid: replyToUuid,
+        };
+        set((state) => ({
+          replyLoading: false,
+          thread: [...state.thread, optimisticMessage],
+        }));
+      } else {
+        set({ replyLoading: false });
+      }
       return res.ok;
     } catch {
       set({ replyLoading: false });
