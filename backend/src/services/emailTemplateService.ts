@@ -38,9 +38,6 @@ function buildPreviewLinkBlock(previewLink?: string): string {
 // ---------------------------------------------------------------------------
 
 function buildEmail1(vars: EmailTemplateVariables): EmailPreview {
-  const issuesBullets = buildIssuesBulletList(vars.issuesList);
-  const previewBlock = buildPreviewLinkBlock(vars.previewLink);
-
   const subject = `Quick question about ${vars.businessName}'s website`;
   const body = `Hi there,
 
@@ -50,8 +47,8 @@ ${vars.oneLineSummary}
 
 I noticed a few things that could be costing you new patients:
 
-${issuesBullets}
-${previewBlock}
+{{issues_list}}
+{{preview_block}}
 I work with dental practices to fix exactly these kinds of issues. Would you be open to a quick 10-minute call to explore how we could help ${vars.businessName} get more patients through your website?
 
 Best,
@@ -65,8 +62,6 @@ ${vars.senderName}`;
 // ---------------------------------------------------------------------------
 
 function buildEmail2(vars: EmailTemplateVariables): EmailPreview {
-  const criticalBullets = buildIssuesBulletList(vars.criticalMissing);
-
   const subject = `Re: Quick question about ${vars.businessName}'s website`;
   const body = `Hi again,
 
@@ -74,7 +69,7 @@ I wanted to follow up on my last email about ${vars.businessName}'s website.
 
 The items I flagged as critically missing could be making a real difference in whether new patients choose your practice over a competitor:
 
-${criticalBullets}
+{{critical_missing}}
 
 Practices that address these gaps typically see a measurable increase in new patient inquiries within the first few weeks.
 
@@ -113,7 +108,14 @@ ${vars.senderName}`;
 export function generatePreviewEmail(
   vars: EmailTemplateVariables
 ): EmailPreview {
-  return buildEmail1(vars);
+  const result = buildEmail1(vars);
+  // For preview, replace Instantly placeholders with actual values
+  const issuesBullets = buildIssuesBulletList(vars.issuesList);
+  const previewBlock = buildPreviewLinkBlock(vars.previewLink);
+  result.body = result.body
+    .replace("{{issues_list}}", issuesBullets)
+    .replace("{{preview_block}}", previewBlock);
+  return result;
 }
 
 export function generateSequence(
