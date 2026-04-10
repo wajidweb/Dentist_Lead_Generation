@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { MapPin, Calendar, TrendingUp, Users, Mail, Zap } from "lucide-react";
 import { useLeadsStore } from "../../store/leadsStore";
+import { useEmailOutreachStore } from "../../store/emailOutreachStore";
 import {
   AreaChart,
   Area,
@@ -97,6 +98,7 @@ const DonutTooltip = ({ active, payload }: { active?: boolean; payload?: { name:
 
 export default function AnalyticsPage() {
   const { stats, statsLoading, fetchDashboardStats } = useLeadsStore();
+  const { outreachStats, fetchOutreachStats } = useEmailOutreachStore();
   const [mounted, setMounted] = useState(false);
   const [preset, setPreset] = useState<Preset>("all");
   const [customStart, setCustomStart] = useState("");
@@ -121,6 +123,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     fetchDashboardStats();
+    fetchOutreachStats();
     const t = setTimeout(() => setMounted(true), 50);
     return () => clearTimeout(t);
   }, []);
@@ -140,8 +143,8 @@ export default function AnalyticsPage() {
         { name: "Discovered", value: stats.discovered },
         { name: "Analyzed", value: stats.analyzed },
         { name: "Qualified", value: stats.qualified },
-        { name: "Emailed", value: stats.emailSent },
-        { name: "Replied", value: stats.replied },
+        { name: "Emailed", value: outreachStats?.totalSent ?? stats.emailSent },
+        { name: "Replied", value: outreachStats?.replied ?? stats.replied },
         { name: "Converted", value: stats.converted },
       ]
     : [];
@@ -157,13 +160,16 @@ export default function AnalyticsPage() {
 
   const funnelColors = ["#A8D4B8", "#7BC095", "#3D8B5E", "#2D7A4E", "#1E6B3E", "#155030"];
 
-  const conversionRate = stats && stats.emailSent > 0
-    ? parseFloat(((stats.converted / stats.emailSent) * 100).toFixed(1))
+  const emailTotal = outreachStats?.totalSent ?? (stats?.emailSent ?? 0);
+  const conversionRate = emailTotal > 0
+    ? parseFloat(((stats?.converted ?? 0) / emailTotal * 100).toFixed(1))
     : 0;
 
-  const replyRate = stats && stats.emailSent > 0
-    ? parseFloat(((stats.replied / stats.emailSent) * 100).toFixed(1))
-    : 0;
+  const replyRate = outreachStats && outreachStats.totalSent > 0
+    ? parseFloat(((outreachStats.replied / outreachStats.totalSent) * 100).toFixed(1))
+    : stats && stats.emailSent > 0
+      ? parseFloat(((stats.replied / stats.emailSent) * 100).toFixed(1))
+      : 0;
 
   const qualifyRate = stats && stats.totalLeads > 0
     ? parseFloat(((stats.qualified / stats.totalLeads) * 100).toFixed(1))
@@ -402,8 +408,8 @@ export default function AnalyticsPage() {
                 { label: "Discovered", value: stats.discovered, color: funnelColors[0] },
                 { label: "Analyzed",   value: stats.analyzed,   color: funnelColors[1] },
                 { label: "Qualified",  value: stats.qualified,  color: funnelColors[2] },
-                { label: "Emailed",    value: stats.emailSent,  color: funnelColors[3] },
-                { label: "Replied",    value: stats.replied,    color: funnelColors[4] },
+                { label: "Emailed",    value: outreachStats?.totalSent ?? stats.emailSent,  color: funnelColors[3] },
+                { label: "Replied",    value: outreachStats?.replied ?? stats.replied,    color: funnelColors[4] },
                 { label: "Converted",  value: stats.converted,  color: funnelColors[5] },
               ].map((stage) => {
                 const pct = stats.totalLeads > 0 ? (stage.value / stats.totalLeads) * 100 : 0;

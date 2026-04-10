@@ -36,11 +36,6 @@ interface AddLeadsBulkResponse {
   [key: string]: unknown;
 }
 
-interface RegisterWebhookResponse {
-  id: string;
-  [key: string]: unknown;
-}
-
 // ---------------------------------------------------------------------------
 // Low-level HTTP helper — V2 API with Bearer token auth
 // ---------------------------------------------------------------------------
@@ -269,21 +264,6 @@ export async function getCampaignAnalytics(
 }
 
 // ---------------------------------------------------------------------------
-// Webhooks — V2 endpoints
-// ---------------------------------------------------------------------------
-
-export async function registerWebhook(
-  url: string,
-  eventTypes: string[]
-): Promise<RegisterWebhookResponse> {
-  const result = await requestWithRetry("POST", "/webhooks", {
-    url,
-    event_types: eventTypes,
-  });
-  return (result ?? { id: "webhook" }) as RegisterWebhookResponse;
-}
-
-// ---------------------------------------------------------------------------
 // Email Account Management — V2 endpoints
 // ---------------------------------------------------------------------------
 
@@ -397,12 +377,24 @@ export async function getCampaignSummary(
   campaignId: string
 ): Promise<unknown> {
   console.log("[Instantly] Fetching campaign analytics:", campaignId);
-  // V2: GET /campaigns/analytics?id=<campaignId>
+
+  // Try POST with JSON body first (as per Instantly docs)
+  try {
+    const result = await requestWithRetry("POST", "/campaigns/analytics", {
+      id: campaignId,
+    });
+    console.log("[Instantly] Analytics response (POST):", JSON.stringify(result));
+    return result;
+  } catch (postErr) {
+    console.warn("[Instantly] POST analytics failed, trying GET:", postErr);
+  }
+
+  // Fallback: GET with query param
   const result = await requestWithRetry(
     "GET",
     `/campaigns/analytics?id=${campaignId}`
   );
-  console.log("[Instantly] Analytics response:", JSON.stringify(result));
+  console.log("[Instantly] Analytics response (GET):", JSON.stringify(result));
   return result;
 }
 

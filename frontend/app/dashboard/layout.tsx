@@ -59,7 +59,7 @@ export default function DashboardLayout({
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -80,7 +80,7 @@ export default function DashboardLayout({
           </span>
         </header>
 
-        <main className="flex-1 bg-[#F5F1EB] p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 bg-[#F5F1EB] p-4 sm:p-6 lg:p-8 overflow-auto">
           {children}
         </main>
       </div>

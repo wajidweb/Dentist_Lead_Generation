@@ -10,44 +10,15 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-export interface WebhookEventPayload {
-  event_type: string;
-  campaign_id: string;
-  lead_email: string;
-  timestamp?: string;
-  data?: Record<string, unknown>;
-}
-
 export interface OutreachStats {
   totalSent: number;
   opened: number;
   replied: number;
   bounced: number;
-  openRate: string;
-  replyRate: string;
-  bounceRate: string;
+  openRate: number;
+  replyRate: number;
+  bounceRate: number;
   campaign: ICampaign | null;
-}
-
-// ---------------------------------------------------------------------------
-// Status transition guard — don't downgrade (e.g., replied → opened)
-// ---------------------------------------------------------------------------
-
-const STATUS_RANK: Record<string, number> = {
-  pending: 0,
-  sent: 1,
-  opened: 2,
-  bounced: 2, // bounced and opened are parallel; neither overwrites the other
-  replied: 3,
-};
-
-function isStatusUpgrade(
-  current: string | undefined,
-  next: string
-): boolean {
-  const currentRank = STATUS_RANK[current ?? "pending"] ?? 0;
-  const nextRank = STATUS_RANK[next] ?? 0;
-  return nextRank > currentRank;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +34,7 @@ export async function getOrCreateCampaign(
 
   const sendingEmail =
     fromOverride || process.env.INSTANTLY_EMAIL || userEmail;
-  const campaignName = `DentalLeads – ${userEmail}`;
+  const campaignName = `DentalLeads`;
 
   // Build a placeholder sequence so Instantly accepts the campaign creation
   const placeholderVars: EmailTemplateVariables = {
@@ -88,28 +59,12 @@ export async function getOrCreateCampaign(
   // Activate the campaign
   await instantlyService.activateCampaign(instantlyCampaignId);
 
-  // Register webhook
-  const webhookBaseUrl = process.env.WEBHOOK_BASE_URL ?? "";
-  let instantlyWebhookId: string | undefined;
-  if (webhookBaseUrl) {
-    try {
-      const webhookData = await instantlyService.registerWebhook(
-        `${webhookBaseUrl}/api/webhooks/instantly`,
-        ["email_opened", "email_replied", "email_bounced", "email_sent"]
-      );
-      instantlyWebhookId = webhookData.id;
-    } catch (err) {
-      console.warn("Failed to register Instantly webhook:", err);
-    }
-  }
-
   const campaign = await Campaign.create({
     userEmail,
     instantlyCampaignId,
     name: campaignName,
     status: "active",
     sendingEmail,
-    instantlyWebhookId,
     leadsAdded: 0,
     emailsSent: 0,
     emailsOpened: 0,
@@ -191,126 +146,6 @@ export async function sendOutreach(
 }
 
 // ---------------------------------------------------------------------------
-// handleWebhookEvent
-// ---------------------------------------------------------------------------
-
-export async function handleWebhookEvent(
-  payload: WebhookEventPayload
-): Promise<void> {
-  const { event_type, campaign_id, lead_email } = payload;
-
-  console.log(`[Webhook] Processing: event_type=${event_type}, campaign_id=${campaign_id}`);
-
-  // Map Instantly event types to our outreach status
-  // Instantly may send various event type formats
-  const eventStatusMap: Record<string, "sent" | "opened" | "replied" | "bounced"> = {
-    email_sent: "sent",
-    "email.sent": "sent",
-    sent: "sent",
-    email_opened: "opened",
-    "email.opened": "opened",
-    opened: "opened",
-    open: "opened",
-    email_replied: "replied",
-    "email.replied": "replied",
-    replied: "replied",
-    reply: "replied",
-    email_bounced: "bounced",
-    "email.bounced": "bounced",
-    bounced: "bounced",
-    bounce: "bounced",
-    email_clicked: "opened",
-    "email.clicked": "opened",
-    clicked: "opened",
-    click: "opened",
-    lead_interested: "replied",
-    lead_not_interested: "replied",
-    lead_meeting_booked: "replied",
-    lead_meeting_completed: "replied",
-    lead_won: "replied",
-    lead_out_of_office: "opened",
-  };
-
-  const newStatus = eventStatusMap[event_type];
-  if (!newStatus) {
-    console.log(`[Webhook] Unknown event type: ${event_type} — ignoring`);
-    return;
-  }
-
-  // Try exact match first (email + campaign), then fallback to just email
-  // Also try case-insensitive search
-  const emailLower = lead_email.toLowerCase().trim();
-  console.log(`[Webhook] Searching for lead with email: "${emailLower}", campaign: "${campaign_id}"`);
-
-  let lead = await Lead.findOne({
-    email: { $regex: new RegExp(`^${emailLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-    instantlyCampaignId: campaign_id,
-  });
-
-  if (!lead) {
-    // Fallback: find by email only (campaign might have been recreated)
-    lead = await Lead.findOne({
-      email: { $regex: new RegExp(`^${emailLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-    });
-    if (lead) console.log(`[Webhook] Found lead via email-only fallback: ${lead._id}`);
-  }
-
-  if (!lead) {
-    console.warn(
-      `Webhook: lead not found for campaign ${campaign_id} (email redacted for PII)`
-    );
-    return;
-  }
-
-  console.log(`[Webhook] Found lead: ${lead._id}, current outreachStatus: ${lead.outreachStatus}, updating to: ${newStatus}`);
-
-  const now = new Date();
-
-  // Only upgrade status, never downgrade
-  if (isStatusUpgrade(lead.outreachStatus, newStatus)) {
-    lead.outreachStatus = newStatus;
-  }
-
-  // Update the most recent emailHistory entry
-  if (lead.emailHistory.length > 0) {
-    const lastEntry = lead.emailHistory[lead.emailHistory.length - 1];
-    if (isStatusUpgrade(lastEntry.status, newStatus)) {
-      lastEntry.status = newStatus;
-    }
-    if (newStatus === "opened" && !lastEntry.openedAt) {
-      lastEntry.openedAt = now;
-    } else if (newStatus === "replied" && !lastEntry.repliedAt) {
-      lastEntry.repliedAt = now;
-    } else if (newStatus === "bounced" && !lastEntry.bouncedAt) {
-      lastEntry.bouncedAt = now;
-    }
-  }
-
-  // Sync lead status with outreach status where appropriate
-  if (newStatus === "replied" && lead.status !== "converted") {
-    lead.status = "replied";
-  }
-
-  await lead.save();
-
-  // Update campaign counters
-  const counterMap: Record<string, Record<string, number>> = {
-    sent: { emailsSent: 1 },
-    opened: { emailsOpened: 1 },
-    replied: { emailsReplied: 1 },
-    bounced: { emailsBounced: 1 },
-  };
-
-  const incFields = counterMap[newStatus];
-  if (incFields) {
-    await Campaign.findOneAndUpdate(
-      { instantlyCampaignId: campaign_id },
-      { $inc: incFields }
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
 // getCampaignForUser
 // ---------------------------------------------------------------------------
 
@@ -330,6 +165,67 @@ export async function getOutreachStats(
 ): Promise<OutreachStats> {
   const campaign = await Campaign.findOne({ userEmail });
 
+  // Try fetching real stats from Instantly API first
+  if (campaign?.instantlyCampaignId) {
+    try {
+      const rawResult = await instantlyService.getCampaignSummary(
+        campaign.instantlyCampaignId
+      );
+
+      // Instantly returns an array — take the first element
+      const analyticsRaw = Array.isArray(rawResult) ? rawResult[0] : rawResult;
+      const analytics = (analyticsRaw ?? null) as Record<string, unknown> | null;
+
+      console.log("[OutreachStats] Instantly analytics raw response:", JSON.stringify(analytics));
+      if (analytics) {
+        console.log("[OutreachStats] All fields and values:");
+        for (const [key, value] of Object.entries(analytics)) {
+          console.log(`  ${key}: ${JSON.stringify(value)}`);
+        }
+        // Instantly V2 API field names from /campaigns/analytics
+        const totalSent = Number(
+          analytics.emails_sent_count ?? analytics.sent ?? analytics.emails_sent ?? 0
+        );
+        const opened = Number(
+          analytics.open_count_unique ?? analytics.open_count ?? analytics.opened ?? 0
+        );
+        const replied = Number(
+          analytics.reply_count ?? analytics.reply_count_unique ?? analytics.replied ?? analytics.replies ?? 0
+        );
+        const bounced = Number(
+          analytics.bounced_count ?? analytics.bounced ?? analytics.emails_bounced ?? 0
+        );
+
+        const delivered = totalSent - bounced;
+        const openRate = delivered > 0 ? Math.round((opened / delivered) * 1000) / 10 : 0;
+        const replyRate = delivered > 0 ? Math.round((replied / delivered) * 1000) / 10 : 0;
+        const bounceRate = totalSent > 0 ? Math.round((bounced / totalSent) * 1000) / 10 : 0;
+
+        // Also sync counters back to MongoDB campaign for consistency
+        await Campaign.findByIdAndUpdate(campaign._id, {
+          emailsSent: totalSent,
+          emailsOpened: opened,
+          emailsReplied: replied,
+          emailsBounced: bounced,
+        });
+
+        return {
+          totalSent,
+          opened,
+          replied,
+          bounced,
+          openRate,
+          replyRate,
+          bounceRate,
+          campaign,
+        };
+      }
+    } catch (err) {
+      console.warn("[OutreachStats] Failed to fetch from Instantly API, falling back to MongoDB:", err);
+    }
+  }
+
+  // Fallback: count from MongoDB
   const dateFilter: Record<string, unknown> = {};
   if (dateRange?.startDate || dateRange?.endDate) {
     dateFilter.lastOutreachAt = {};
@@ -351,18 +247,10 @@ export async function getOutreachStats(
       Lead.countDocuments({ outreachStatus: "bounced", ...dateFilter }),
     ]);
 
-  const openRate =
-    totalSent > 0
-      ? ((opened / totalSent) * 100).toFixed(1)
-      : "0";
-  const replyRate =
-    totalSent > 0
-      ? ((replied / totalSent) * 100).toFixed(1)
-      : "0";
-  const bounceRate =
-    totalSent > 0
-      ? ((bounced / totalSent) * 100).toFixed(1)
-      : "0";
+  const delivered = totalSent - bounced;
+  const openRate = delivered > 0 ? Math.round((opened / delivered) * 1000) / 10 : 0;
+  const replyRate = delivered > 0 ? Math.round((replied / delivered) * 1000) / 10 : 0;
+  const bounceRate = totalSent > 0 ? Math.round((bounced / totalSent) * 1000) / 10 : 0;
 
   return {
     totalSent,

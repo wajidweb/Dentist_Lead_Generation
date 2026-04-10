@@ -9,7 +9,6 @@ import analysisRoutes from "./routes/analysisRoutes";
 import emailOutreachRoutes from "./routes/emailOutreachRoutes";
 import settingsRoutes from "./routes/settingsRoutes";
 import uniboxRoutes from "./routes/uniboxRoutes";
-import webhookRoutes from "./routes/webhookRoutes";
 import { startAnalysisWorker, stopAnalysisWorker } from "./jobs/analysisWorker";
 
 dotenv.config();
@@ -25,11 +24,6 @@ app.use(
     credentials: true,
   })
 );
-
-// Webhook routes must be registered BEFORE express.json() so the raw body
-// middleware in webhookRoutes can capture the raw request stream for HMAC
-// signature verification.
-app.use("/api/webhooks", webhookRoutes);
 
 app.use(express.json());
 

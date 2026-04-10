@@ -116,7 +116,7 @@ const PIPELINE_COLORS = [
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const { stats, statsLoading, fetchDashboardStats } = useLeadsStore();
-  const { fetchOutreachStats } = useEmailOutreachStore();
+  const { outreachStats, fetchOutreachStats } = useEmailOutreachStore();
   const [mounted, setMounted] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<{ name: string; value: number; color: string } | null>(null);
 
@@ -129,7 +129,7 @@ export default function DashboardPage() {
 
   const totalLeads = useCountUp(stats?.totalLeads ?? 0);
   const discovered = useCountUp(stats?.discovered ?? 0);
-  const emailSent = useCountUp(stats?.emailSent ?? 0);
+  const emailSent = useCountUp(outreachStats?.totalSent ?? stats?.emailSent ?? 0);
   const converted = useCountUp(stats?.converted ?? 0);
   const revenue = useCountUp(stats?.revenue ?? 0);
 
@@ -283,7 +283,7 @@ export default function DashboardPage() {
           ) : (
             <p className="text-3xl font-bold text-[#1A2E22] tabular-nums">{emailSent}</p>
           )}
-          <p className="text-[11px] text-[#8A9590] mt-1.5">{stats?.replied ?? 0} replied</p>
+          <p className="text-[11px] text-[#8A9590] mt-1.5">{outreachStats?.replied ?? stats?.replied ?? 0} replied</p>
         </div>
 
         {/* Conversion Rate Gauge */}
@@ -320,7 +320,7 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </div>
           </div>
-          <p className="text-[11px] text-[#8A9590] mt-0.5">{converted} of {emailSent} emailed</p>
+          <p className="text-[11px] text-[#8A9590] mt-0.5">{converted} of {outreachStats?.totalSent ?? stats?.emailSent ?? 0} emailed</p>
         </div>
       </div>
 

@@ -6,7 +6,6 @@ export interface ICampaign extends Document {
   name: string;
   status: "draft" | "active" | "paused" | "completed";
   sendingEmail: string;
-  instantlyWebhookId?: string;
   leadsAdded: number;
   emailsSent: number;
   emailsOpened: number;
@@ -27,7 +26,6 @@ const campaignSchema = new Schema<ICampaign>(
       default: "draft",
     },
     sendingEmail: { type: String, required: true },
-    instantlyWebhookId: { type: String },
     leadsAdded: { type: Number, default: 0 },
     emailsSent: { type: Number, default: 0 },
     emailsOpened: { type: Number, default: 0 },
