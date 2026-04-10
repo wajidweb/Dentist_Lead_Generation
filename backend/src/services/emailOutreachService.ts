@@ -98,11 +98,27 @@ export async function sendOutreach(
   // Use overridden "from" email if provided, otherwise fall back to campaign default
   const campaign = await getOrCreateCampaign(userEmail, fromOverride?.trim());
 
+  const previewBlock = previewLink
+    ? `\nI've also put together a quick mockup of what an improved site could look like:\n${previewLink}\n`
+    : "";
+
+  const issuesList = (lead.websiteAnalysis?.issuesList ?? []) as string[];
+  const issuesBullets = issuesList.length > 0
+    ? issuesList.map((item: string) => `• ${item}`).join("\n")
+    : "• No specific issues noted";
+
+  const criticalMissing = (lead.websiteAnalysis?.criticalMissing ?? []) as string[];
+  const criticalBullets = criticalMissing.length > 0
+    ? criticalMissing.map((item: string) => `• ${item}`).join("\n")
+    : "• No specific issues noted";
+
   const variables: Record<string, string> = {
     business_name: lead.businessName,
     website_url: lead.website ?? "",
     one_line_summary: lead.websiteAnalysis?.oneLineSummary ?? "",
-    ...(previewLink ? { preview_link: previewLink } : {}),
+    preview_block: previewBlock,
+    issues_list: issuesBullets,
+    critical_missing: criticalBullets,
   };
 
   const result = await instantlyService.addLeadToCampaign(
