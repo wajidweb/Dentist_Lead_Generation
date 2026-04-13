@@ -11,6 +11,7 @@ import {
   Zap,
   Shield,
   Circle,
+  Trash2,
 } from "lucide-react";
 import { useSettingsStore, EmailAccount } from "../../store/settingsStore";
 
@@ -67,10 +68,12 @@ function EmailAccountCard({
   account,
   isSelected,
   onSelect,
+  onDelete,
 }: {
   account: EmailAccount;
   isSelected: boolean;
   onSelect: () => void;
+  onDelete: () => void;
 }) {
   const statusInfo = getStatusInfo(account.status);
   const warmupInfo = getWarmupInfo(account.warmup_status);
@@ -144,12 +147,12 @@ function EmailAccountCard({
         </div>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-[#EDE8E0]">
+      <div className="mt-3 pt-3 border-t border-[#EDE8E0] flex items-center gap-2">
         <button
           onClick={onSelect}
           disabled={isSelected}
           className={`
-            w-full px-3 py-1.5 rounded-xs text-xs font-semibold transition-all
+            flex-1 px-3 py-1.5 rounded-xs text-xs font-semibold transition-all
             ${
               isSelected
                 ? "bg-[#3D8B5E]/10 text-[#3D8B5E] cursor-default"
@@ -158,6 +161,13 @@ function EmailAccountCard({
           `}
         >
           {isSelected ? "Currently Selected" : "Use for Outreach"}
+        </button>
+        <button
+          onClick={onDelete}
+          title="Delete account"
+          className="p-1.5 rounded-xs transition-all text-[#8A9590] hover:text-[#C75555] hover:bg-[#C75555]/10"
+        >
+          <Trash2 size={14} />
         </button>
       </div>
     </div>
@@ -171,6 +181,7 @@ export default function SettingsPage() {
     selectedSendingEmail,
     fetchEmailAccounts,
     setSelectedSendingEmail,
+    deleteEmailAccount,
   } = useSettingsStore();
 
   const [mounted, setMounted] = useState(false);
@@ -184,6 +195,18 @@ export default function SettingsPage() {
   const handleSelect = (email: string) => {
     setSelectedSendingEmail(email);
     toast.success(`${email} set as sending email`);
+  };
+
+  const handleDelete = async (email: string) => {
+    if (!window.confirm("Are you sure you want to delete this email account?")) {
+      return;
+    }
+    const success = await deleteEmailAccount(email);
+    if (success) {
+      toast.success(`${email} deleted successfully`);
+    } else {
+      toast.error(`Failed to delete ${email}`);
+    }
   };
 
   if (!mounted) return null;
@@ -281,6 +304,7 @@ export default function SettingsPage() {
                     account={account}
                     isSelected={selectedSendingEmail === account.email}
                     onSelect={() => handleSelect(account.email)}
+                    onDelete={() => handleDelete(account.email)}
                   />
                 ))}
               </div>

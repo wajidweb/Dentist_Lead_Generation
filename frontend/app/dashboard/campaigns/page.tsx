@@ -68,8 +68,8 @@ function LeadRow({ lead }: { lead: CampaignLead }) {
   };
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#FAF8F5] transition text-sm">
-      <div className="flex-1 min-w-0">
+    <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 hover:bg-[#FAF8F5] transition text-sm">
+      <div className="flex-1 min-w-0 w-full sm:w-auto">
         <p className="font-medium text-[#1A2E22] truncate">
           {lead.businessName}
         </p>
@@ -103,7 +103,7 @@ function LeadRow({ lead }: { lead: CampaignLead }) {
       )}
 
       {lead.lastOutreachAt && (
-        <span className="text-[11px] text-[#8A9590] flex items-center gap-1">
+        <span className="text-[11px] text-[#8A9590] hidden sm:flex items-center gap-1">
           <Clock size={10} />
           {new Date(lead.lastOutreachAt).toLocaleDateString()}
         </span>
@@ -244,7 +244,7 @@ function CampaignCard({
               {campaign.leadsCount}
             </span>
           </div>
-          <div className="ml-auto flex items-center gap-3 text-[11px] text-[#6B7570]">
+          <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-3 text-[11px] text-[#6B7570] mt-1 sm:mt-0">
             <span>
               Open rate:{" "}
               <span className="font-semibold text-[#1A2E22]">{openRate}%</span>
@@ -307,7 +307,7 @@ export default function CampaignsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-[#1A2E22]">Campaigns</h1>
           <p className="text-sm text-[#5A6B60] mt-1">
@@ -326,11 +326,11 @@ export default function CampaignsPage() {
 
       {/* Summary Bar */}
       {campaigns.length > 0 && (
-        <div className="flex items-center gap-4 px-5 py-3 bg-white rounded-xs border border-[#E8E2D8]">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-white rounded-xs border border-[#E8E2D8]">
           <span className="text-xs font-semibold text-[#6B7570] uppercase tracking-wider">
             All Campaigns
           </span>
-          <div className="flex items-center gap-4 ml-auto text-sm">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="text-[#5A6B60]">
               Campaigns: <span className="font-bold text-[#1A2E22]">{campaigns.length}</span>
             </span>

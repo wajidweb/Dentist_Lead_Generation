@@ -47,3 +47,29 @@ export const getEmailAccountStatus = async (
   }
 };
 
+// ---------------------------------------------------------------------------
+// DELETE /api/settings/email-accounts/:email
+// Delete an email account from Instantly.ai
+// ---------------------------------------------------------------------------
+
+export const deleteEmailAccount = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const email = req.params.email as string;
+    if (!email) {
+      res.status(400).json({ message: "Email is required" });
+      return;
+    }
+
+    await instantlyService.deleteEmailAccount(email);
+    res.json({ message: "Email account deleted successfully" });
+  } catch (error) {
+    console.error("Delete email account error:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to delete email account";
+    res.status(500).json({ message });
+  }
+};
+
