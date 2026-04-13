@@ -296,6 +296,11 @@ export async function getEmailAccountStatus(
   return (result as InstantlyEmailAccount) ?? null;
 }
 
+export async function deleteEmailAccount(email: string): Promise<void> {
+  console.log("[Instantly] Deleting email account:", email);
+  await requestWithRetry("DELETE", `/accounts/${encodeURIComponent(email)}`);
+}
+
 // ---------------------------------------------------------------------------
 // Campaign Management (extended) — V2 endpoints
 // ---------------------------------------------------------------------------

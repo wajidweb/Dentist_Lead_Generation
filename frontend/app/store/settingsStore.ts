@@ -16,6 +16,7 @@ interface SettingsStore {
 
   fetchEmailAccounts: () => Promise<void>;
   setSelectedSendingEmail: (email: string) => void;
+  deleteEmailAccount: (email: string) => Promise<boolean>;
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
@@ -44,5 +45,31 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setSelectedSendingEmail: (email: string) => {
     set({ selectedSendingEmail: email });
     localStorage.setItem("selectedSendingEmail", email);
+  },
+
+  deleteEmailAccount: async (email: string): Promise<boolean> => {
+    try {
+      const res = await apiFetch(`/settings/email-accounts/${encodeURIComponent(email)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) return false;
+
+      set((state) => {
+        const updatedAccounts = state.emailAccounts.filter(
+          (a) => a.email !== email
+        );
+        const wasSelected = state.selectedSendingEmail === email;
+        if (wasSelected) {
+          localStorage.removeItem("selectedSendingEmail");
+        }
+        return {
+          emailAccounts: updatedAccounts,
+          selectedSendingEmail: wasSelected ? null : state.selectedSendingEmail,
+        };
+      });
+      return true;
+    } catch {
+      return false;
+    }
   },
 }));

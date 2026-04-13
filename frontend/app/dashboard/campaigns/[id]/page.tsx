@@ -126,7 +126,7 @@ function LeadsTab({
   return (
     <div>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#E8E2D8] bg-[#FDFCFA]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-[#E8E2D8] bg-[#FDFCFA]">
         <span className="text-xs font-semibold text-[#5A6B60] uppercase tracking-wider">
           {(details.leads ?? []).length} lead{(details.leads ?? []).length !== 1 ? "s" : ""}
         </span>
@@ -142,7 +142,7 @@ function LeadsTab({
       </div>
 
       {/* Column headers */}
-      <div className="grid grid-cols-[1fr_140px_120px_100px] gap-3 px-5 py-2 bg-[#F5F1EB] border-b border-[#E8E2D8] text-[10px] font-semibold text-[#8A9590] uppercase tracking-wider">
+      <div className="hidden sm:grid grid-cols-[1fr_140px_120px_100px] gap-3 px-5 py-2 bg-[#F5F1EB] border-b border-[#E8E2D8] text-[10px] font-semibold text-[#8A9590] uppercase tracking-wider">
         <span>Business / Email</span>
         <span>Status</span>
         <span>Last Outreach</span>
@@ -166,10 +166,10 @@ function LeadsTab({
             return (
               <div
                 key={lead._id}
-                className="grid grid-cols-[1fr_140px_120px_100px] gap-3 items-center px-5 py-3 hover:bg-[#FAF8F5] transition text-sm"
+                className="flex flex-wrap gap-2 items-center px-4 py-3 hover:bg-[#FAF8F5] transition text-sm sm:grid sm:grid-cols-[1fr_140px_120px_100px] sm:gap-3 sm:px-5"
               >
                 {/* Business / email */}
-                <div className="min-w-0">
+                <div className="min-w-0 w-full sm:w-auto">
                   <p className="font-medium text-[#1A2E22] truncate">{lead.businessName}</p>
                   <p className="text-[11px] text-[#8A9590] truncate">{lead.email ?? "—"}</p>
                 </div>
@@ -185,7 +185,7 @@ function LeadsTab({
                 </div>
 
                 {/* Last outreach */}
-                <div className="flex items-center gap-1 text-[11px] text-[#8A9590]">
+                <div className="hidden sm:flex items-center gap-1 text-[11px] text-[#8A9590]">
                   {lead.lastOutreachAt ? (
                     <>
                       <Clock size={10} />
@@ -197,7 +197,7 @@ function LeadsTab({
                 </div>
 
                 {/* Links */}
-                <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2">
                   {lead.website && (
                     <a
                       href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
@@ -553,7 +553,7 @@ function OptionsTab({
     <div className="space-y-4">
       {/* Open Tracking */}
       <div className="bg-white rounded-xs border border-[#E8E2D8] p-5">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#3D8B5E]/10 flex items-center justify-center">
               <Eye size={16} className="text-[#3D8B5E]" />
@@ -594,7 +594,7 @@ function OptionsTab({
 
       {/* Link Tracking */}
       <div className="bg-white rounded-xs border border-[#E8E2D8] p-5">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#B89A4A]/10 flex items-center justify-center">
               <Link2 size={16} className="text-[#B89A4A]" />

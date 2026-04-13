@@ -193,44 +193,44 @@ function ThreadMessage({ email, isSent }: { email: Email; isSent: boolean }) {
 
   return (
     <div
-      className={`px-5 py-4 rounded-xl ${
+      className={`px-3 sm:px-5 py-3 sm:py-4 rounded-xl ${
         isSent
-          ? "bg-[#2A4A3A]/[0.06] border-l-4 border-l-[#3D8B5E] border border-[#3D8B5E]/20 ml-12"
-          : "bg-[#FBF9F6] border-l-4 border-l-[#C47A4A] border border-[#E8E2D8] mr-12 shadow-sm"
+          ? "bg-[#2A4A3A]/[0.06] border-l-4 border-l-[#3D8B5E] border border-[#3D8B5E]/20 ml-4 sm:ml-12"
+          : "bg-[#FBF9F6] border-l-4 border-l-[#C47A4A] border border-[#E8E2D8] mr-4 sm:mr-12 shadow-sm"
       }`}
     >
-      <div className="flex items-center justify-between gap-4 mb-3">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2 min-w-0">
           <div
-            className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white ${
+            className={`shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-[11px] font-bold text-white ${
               isSent ? "ring-2 ring-[#3D8B5E]/30" : "ring-2 ring-[#C47A4A]/30"
             }`}
             style={{ backgroundColor: isSent ? '#3D8B5E' : '#C47A4A' }}
           >
             {isSent ? (
-              <Send size={13} />
+              <Send size={12} />
             ) : (
               (address ?? "?").charAt(0).toUpperCase()
             )}
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-[#1A2E22] truncate">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-[11px] sm:text-xs font-semibold text-[#1A2E22] truncate max-w-[140px] sm:max-w-none">
                 {address ?? "Unknown"}
               </span>
               {isSent ? (
-                <span className="shrink-0 text-[10px] font-bold text-white bg-[#3D8B5E] px-2 py-0.5 rounded-full uppercase tracking-wide">
+                <span className="shrink-0 text-[9px] sm:text-[10px] font-bold text-white bg-[#3D8B5E] px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wide">
                   Sent
                 </span>
               ) : (
-                <span className="shrink-0 text-[10px] font-bold text-white bg-[#C47A4A] px-2 py-0.5 rounded-full uppercase tracking-wide">
+                <span className="shrink-0 text-[9px] sm:text-[10px] font-bold text-white bg-[#C47A4A] px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wide">
                   Received
                 </span>
               )}
             </div>
           </div>
         </div>
-        <span className="shrink-0 text-[11px] text-[#8A9590] flex items-center gap-1">
+        <span className="hidden sm:flex shrink-0 text-[11px] text-[#8A9590] items-center gap-1">
           <Clock size={10} />
           {formatFullDate(dateStr)}
         </span>
@@ -303,41 +303,46 @@ function EmailDetail({
   return (
     <div className="grid h-full" style={{ gridTemplateRows: "auto 1fr auto" }}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-[#EDE8E0] bg-white">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[#EDE8E0] bg-white">
+        {/* Back button row — mobile only */}
         <button
           onClick={onBack}
-          className="lg:hidden flex items-center gap-1.5 text-xs font-medium text-[#5A6B60] hover:text-[#1A2E22] transition"
+          className="md:hidden flex items-center gap-1.5 text-xs font-medium text-[#5A6B60] hover:text-[#1A2E22] transition mb-2"
           aria-label="Back to inbox"
         >
           <ArrowLeft size={14} />
           Back
         </button>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-bold text-[#1A2E22] leading-snug">
+
+        {/* Subject + badge row */}
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-sm sm:text-lg font-bold text-[#1A2E22] leading-snug line-clamp-2 min-w-0">
             {email.subject ?? "(No subject)"}
           </h2>
-          <div className="flex items-center gap-2 mt-1.5 text-sm text-[#5A6B60]">
-            <span>From: {(latestMessage ?? email).from_address ?? "—"}</span>
-          </div>
-          <div className="text-sm text-[#5A6B60]">
-            <span>to: {(latestMessage ?? email).to_address ?? "—"}</span>
+          <div className="shrink-0">
+            {isSent ? (
+              <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-[#B89A4A] bg-[#B89A4A]/10 px-1.5 sm:px-2 py-0.5 rounded-lg uppercase tracking-wide whitespace-nowrap">
+                <Send size={10} />
+                Sent
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-[#3D8B5E] bg-[#3D8B5E]/10 px-1.5 sm:px-2 py-0.5 rounded-lg uppercase tracking-wide whitespace-nowrap">
+                <Mail size={10} />
+                Received
+              </span>
+            )}
           </div>
         </div>
-        <div className="shrink-0 text-right">
-          <p className="text-xs text-[#8A9590]">
+
+        {/* From / To + date */}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 mt-1.5 text-xs sm:text-sm text-[#5A6B60]">
+          <div className="min-w-0">
+            <p className="truncate">From: {(latestMessage ?? email).from_address ?? "—"}</p>
+            <p className="truncate">To: {(latestMessage ?? email).to_address ?? "—"}</p>
+          </div>
+          <p className="hidden sm:block text-xs text-[#8A9590] shrink-0">
             {formatFullDate(dateStr)}
           </p>
-          {isSent ? (
-            <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold text-[#B89A4A] bg-[#B89A4A]/10 px-2 py-0.5 rounded-lg uppercase tracking-wide">
-              <Send size={10} />
-              Sent
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold text-[#3D8B5E] bg-[#3D8B5E]/10 px-2 py-0.5 rounded-lg uppercase tracking-wide">
-              <Mail size={10} />
-              Received
-            </span>
-          )}
         </div>
       </div>
 
@@ -353,7 +358,7 @@ function EmailDetail({
         ) : (
           <>
             {/* Latest message */}
-            <div className="px-6 py-5 border-b border-[#EDE8E0]">
+            <div className="px-3 sm:px-6 py-4 sm:py-5 border-b border-[#EDE8E0]">
               <ThreadMessage email={latestMessage ?? email} isSent={isSentByUser(latestMessage ?? email)} />
             </div>
 
@@ -378,7 +383,7 @@ function EmailDetail({
                 </button>
 
                 {threadExpanded && (
-                  <div className="flex flex-col gap-4 px-6 pb-5">
+                  <div className="flex flex-col gap-4 px-3 sm:px-6 pb-5">
                     {olderMessages.map((msg) => (
                       <ThreadMessage key={msg.id} email={msg} isSent={isSentByUser(msg)} />
                     ))}
@@ -420,7 +425,11 @@ function EmailDetail({
             ) : (
               <Send size={14} />
             )}
-            {replyLoading ? "Sending..." : "Send"}
+            {replyLoading ? (
+              <span className="hidden sm:inline">Sending...</span>
+            ) : (
+              <span className="hidden sm:inline">Send</span>
+            )}
           </button>
         </div>
       </div>
@@ -506,6 +515,7 @@ export default function UniboxPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [showDetail, setShowDetail] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -606,7 +616,7 @@ export default function UniboxPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Page Header */}
-      <div className="shrink-0 flex items-center justify-between mb-5">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="text-xl font-bold text-[#1A2E22] flex items-center gap-2">
             <Inbox size={20} className="text-[#3D8B5E]" />
@@ -621,15 +631,25 @@ export default function UniboxPage() {
             Email conversations from your Instantly.ai campaigns
           </p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[#D8D2C8] text-[#5A6B60] hover:bg-[#F5F1EB] hover:border-[#CCC8C0] transition-all disabled:opacity-50"
-          aria-label="Refresh inbox"
-        >
-          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSidebar(true)}
+            className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[#D8D2C8] text-[#5A6B60] hover:bg-[#F5F1EB] hover:border-[#CCC8C0] transition-all"
+            aria-label="Show filters"
+          >
+            <Zap size={12} />
+            Filters
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[#D8D2C8] text-[#5A6B60] hover:bg-[#F5F1EB] hover:border-[#CCC8C0] transition-all disabled:opacity-50"
+            aria-label="Refresh inbox"
+          >
+            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* 3-column layout */}
@@ -637,8 +657,32 @@ export default function UniboxPage() {
         className="flex flex-1 rounded-xl border border-[#E8E2D8] overflow-hidden bg-white shadow-lg shadow-black/5 min-h-0"
       >
 
+        {/* Mobile sidebar backdrop */}
+        {showSidebar && (
+          <div
+            className="fixed inset-0 z-30 bg-black/20 md:hidden"
+            onClick={() => setShowSidebar(false)}
+          />
+        )}
+
         {/* Left: Folders + Filters */}
-        <div className="w-40 shrink-0 border-r border-[#E8E2D8] bg-[#FAF8F5] flex flex-col py-3 px-2 gap-1">
+        <div
+          className={`
+            ${showSidebar ? "fixed inset-y-0 left-0 z-40 w-64 shadow-xl" : "hidden"}
+            md:relative md:flex md:w-40 md:shadow-none md:inset-auto md:z-auto
+            shrink-0 border-r border-[#E8E2D8] bg-[#FAF8F5] flex-col py-3 px-2 gap-1
+          `}
+        >
+          {/* Mobile close button */}
+          <div className="md:hidden flex justify-end px-1 pb-1">
+            <button
+              onClick={() => setShowSidebar(false)}
+              className="text-xs font-medium text-[#5A6B60] hover:text-[#1A2E22] px-2 py-1 rounded-md hover:bg-[#EDE8E0] transition"
+              aria-label="Close filters"
+            >
+              Close
+            </button>
+          </div>
 
           {/* Folder tabs */}
           <p className="text-[10px] font-bold text-[#8A9590] uppercase tracking-widest px-2 pb-1">
@@ -725,7 +769,7 @@ export default function UniboxPage() {
         <div
           className={`
             flex flex-col border-r border-[#E8E2D8]
-            ${showDetail ? "hidden lg:flex lg:w-80 xl:w-96" : "flex flex-1 lg:w-80 xl:w-96"}
+            ${showDetail ? "hidden md:flex md:w-72 lg:w-80 xl:w-96" : "flex flex-1 md:w-72 lg:w-80 xl:w-96"}
             min-w-0
           `}
         >
@@ -845,7 +889,7 @@ export default function UniboxPage() {
         <div
           className={`
             flex-1 flex flex-col min-w-0 overflow-hidden
-            ${showDetail ? "flex" : "hidden lg:flex"}
+            ${showDetail ? "flex" : "hidden md:flex"}
           `}
         >
           {displayEmail ? (
