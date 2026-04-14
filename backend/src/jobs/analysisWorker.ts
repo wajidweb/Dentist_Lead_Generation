@@ -8,7 +8,6 @@ import {
   determineLeadCategory,
 } from "../services/scoreService";
 import { uploadScreenshots } from "../services/cloudinaryService";
-import { findEmailByDomain } from "../services/domainEmailService";
 import Lead from "../models/Lead";
 import AnalysisGroup from "../models/AnalysisGroup";
 
@@ -28,7 +27,7 @@ async function processJob(job: Job<AnalysisJobData>) {
   await job.updateProgress(10);
   const puppeteerResult = await analyzePage(websiteUrl);
   console.log(
-    `${tag} Step 1/4: Puppeteer done — loadTime=${puppeteerResult.loadTimeMs}ms, https=${puppeteerResult.isHttps}, text=${puppeteerResult.pageText.length} chars, screenshot=${puppeteerResult.desktopScreenshot.length} bytes, emails=${puppeteerResult.emails.length > 0 ? puppeteerResult.emails.join(", ") : "none"}`
+    `${tag} Step 1/4: Puppeteer done — loadTime=${puppeteerResult.loadTimeMs}ms, https=${puppeteerResult.isHttps}, text=${puppeteerResult.pageText.length} chars, screenshot=${puppeteerResult.desktopScreenshot.length} bytes`
   );
 
   // Step 2: Claude — visual + content analysis
@@ -109,39 +108,12 @@ async function processJob(job: Job<AnalysisJobData>) {
     websiteQualityScore,
     leadScore,
     leadCategory,
+    ...(claudeResult.likelyOwner ? { likelyOwner: { ...claudeResult.likelyOwner, source: "claude-analysis" as const } } : {}),
     analyzed: true,
     analysisStatus: "completed",
     analyzedAt: new Date(),
     status: "analyzed",
   };
-
-  // Save email — try website scraping first, then domain search fallback
-  if (!lead.email) {
-    if (puppeteerResult.emails.length > 0) {
-      updateData.email = puppeteerResult.emails[0];
-      updateData.emailSource = "scrape";
-      console.log(`${tag} Email found via scraping: ${puppeteerResult.emails[0]}`);
-    } else {
-      // Fallback: find email by domain (MX lookup + SMTP verification)
-      console.log(`${tag} No email on website — trying domain search...`);
-      try {
-        const domainResult = await findEmailByDomain(websiteUrl);
-        if (domainResult.email) {
-          updateData.email = domainResult.email;
-          updateData.emailSource = "domain-search";
-          if (domainResult.method === "smtp-verified") {
-            updateData.emailVerified = true;
-            updateData.emailVerificationStatus = "deliverable";
-          }
-          console.log(`${tag} Email found via domain search: ${domainResult.email} (${domainResult.method}, tested ${domainResult.candidatesTested} candidates)`);
-        } else {
-          console.log(`${tag} No email found via domain search (tested ${domainResult.candidatesTested} candidates)`);
-        }
-      } catch (err) {
-        console.log(`${tag} Domain email search failed: ${err instanceof Error ? err.message : err}`);
-      }
-    }
-  }
 
   await Lead.findByIdAndUpdate(leadId, updateData);
 
@@ -190,8 +162,17 @@ export function startAnalysisWorker() {
 
   worker.on("failed", async (job, err) => {
     if (!job) return;
+
+    const maxAttempts = job.opts.attempts ?? 1;
+    if (job.attemptsMade < maxAttempts) {
+      console.warn(
+        `[Worker] Attempt ${job.attemptsMade}/${maxAttempts} failed for lead ${job.data.leadId} — will retry: ${err.message}`
+      );
+      return;
+    }
+
     console.error(
-      `[Worker] Job FAILED: lead ${job.data.leadId} — ${err.message}`
+      `[Worker] Job FAILED (final): lead ${job.data.leadId} — ${err.message}`
     );
 
     await Lead.findByIdAndUpdate(job.data.leadId, {

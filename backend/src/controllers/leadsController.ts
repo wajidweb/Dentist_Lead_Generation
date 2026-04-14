@@ -90,6 +90,8 @@ export const update = async (req: Request, res: Response) => {
       "customWebsiteUrl",
       "customWebsiteScreenshot",
       "status",
+      "decisionMakers",
+      "likelyOwner",
     ];
     const data: Record<string, unknown> = {};
     for (const key of allowed) {

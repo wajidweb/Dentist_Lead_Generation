@@ -24,9 +24,11 @@ import {
   FileJson,
   FileText,
   Loader2,
+  UserPlus,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useLeadsStore } from "../../store/leadsStore";
+import { useHunterStore } from "../../store/hunterStore";
 
 const statusConfig: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   discovered: { bg: "bg-[#F5F1EB]", text: "text-[#3D5347]", dot: "bg-[#8A9590]", label: "Discovered" },
@@ -61,6 +63,8 @@ function timeAgo(dateStr: string) {
 
 export default function LeadsPage() {
   const { leads, total, page, totalPages, loading, stats, fetchLeads, fetchDashboardStats, deleteLead, bulkDeleteLeads, bulkUpdateStatus, exportLeads } = useLeadsStore();
+  const { isBulkSearching, isSearching, searchDecisionMakers, bulkSearch: hunterBulkSearch } = useHunterStore();
+  const hunterSearching = isBulkSearching();
   const [mounted, setMounted] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -161,6 +165,36 @@ export default function LeadsPage() {
       toast.error("Export failed. No matching leads found.");
     }
     setExporting(false);
+  };
+
+  const handleBulkFindContacts = async () => {
+    const ids = Array.from(selected).slice(0, 10);
+    if (ids.length === 0) return;
+    const result = await hunterBulkSearch(ids);
+    if (result) {
+      const totalAdded = result.results.reduce((sum, r) => sum + r.added, 0);
+      toast.success(`Found ${totalAdded} contact${totalAdded !== 1 ? "s" : ""} across ${ids.length} lead${ids.length !== 1 ? "s" : ""}`);
+      fetchLeads(filters);
+    } else {
+      toast.error("Bulk contact search failed");
+    }
+  };
+
+  const handleFindContact = async (e: React.MouseEvent, leadId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const result = await searchDecisionMakers(leadId);
+    if (result) {
+      const { personalCount: p, genericCount: g } = result;
+      if (p > 0 && g === 0) toast.success(`${p} decision-maker(s) found`);
+      else if (p > 0 && g > 0) toast.success(`${p} decision-maker(s) found (${g} generic hidden)`);
+      else if (p === 0 && g > 0) toast(`Only ${g} generic inbox(es) found — no named contacts`, { icon: "⚠️" });
+      else toast(`No decision-makers found`, { icon: "ℹ️" });
+    } else {
+      const err = useHunterStore.getState().error;
+      toast.error(err || "Contact search failed");
+      useHunterStore.getState().clearError();
+    }
   };
 
   const activeFilterCount = [filters.status, filters.city, filters.search].filter(Boolean).length;
@@ -329,6 +363,15 @@ export default function LeadsPage() {
                 Apply
               </button>
             )}
+            <button
+              onClick={handleBulkFindContacts}
+              disabled={hunterSearching || selected.size > 10}
+              title={selected.size > 10 ? "Maximum 10 leads for bulk search" : "Find decision makers via Hunter.io"}
+              className="px-3 py-1.5 rounded-xs text-xs font-medium text-white bg-[#3D8B5E] hover:bg-[#2D7A4E] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+            >
+              {hunterSearching ? <Loader2 size={12} className="animate-spin" /> : <Users size={12} />}
+              Find Contacts{selected.size > 10 ? " (max 10)" : ""}
+            </button>
             <div className="w-px h-5 bg-white/20 mx-1 hidden sm:block" />
             <button
               onClick={handleBulkDelete}
@@ -501,6 +544,17 @@ export default function LeadsPage() {
                                 {lead.leadCategory}
                               </span>
                             )}
+                            {(() => {
+                              const personalDMs = (lead.decisionMakers ?? []).filter((d) => !d.isGeneric);
+                              const genericDMs = (lead.decisionMakers ?? []).filter((d) => d.isGeneric);
+                              return personalDMs.length > 0 ? (
+                                <span className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#3D8B5E]/10 text-[#3D8B5E]">
+                                  <Users size={8} />
+                                  {personalDMs.length}
+                                  {genericDMs.length > 0 && <span className="text-[#8A9590] font-normal ml-0.5">(+{genericDMs.length})</span>}
+                                </span>
+                              ) : null;
+                            })()}
                           </div>
                           <div className="flex items-center gap-2 sm:gap-2.5 mt-0.5 flex-wrap">
                             <span className="text-[11px] text-[#6B7570] truncate">
@@ -511,7 +565,7 @@ export default function LeadsPage() {
                               <span className="font-semibold text-[#1A2E22] tabular-nums">{lead.googleRating}</span>
                             </span>
                             <span className="hidden sm:inline text-[11px] text-[#8A9590] tabular-nums">
-                              {lead.googleReviewCount.toLocaleString()} reviews
+                              {(lead.googleReviewCount ?? 0).toLocaleString()} reviews
                             </span>
                             <span className="hidden lg:inline-flex items-center gap-1 text-[11px] text-[#8A9590]">
                               <Calendar size={9} />
@@ -566,6 +620,36 @@ export default function LeadsPage() {
                               Website
                             </button>
                           )}
+                          {(() => {
+                            const isLeadSearching = isSearching(lead._id);
+                            const personalDMs = (lead.decisionMakers ?? []).filter((d) => !d.isGeneric);
+                            const genericDMs = (lead.decisionMakers ?? []).filter((d) => d.isGeneric);
+                            const hasPersonal = personalDMs.length > 0;
+                            const titleText = hasPersonal
+                              ? `${personalDMs.length} contact${personalDMs.length !== 1 ? "s" : ""}${genericDMs.length > 0 ? ` (+${genericDMs.length} generic)` : ""} found — click to re-search`
+                              : "Find decision-makers via Hunter.io";
+                            return (
+                              <button
+                                onClick={(e) => handleFindContact(e, lead._id)}
+                                disabled={isLeadSearching}
+                                title={titleText}
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-xs text-[11px] font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                                  hasPersonal
+                                    ? "text-[#3D8B5E] hover:bg-[#3D8B5E]/8"
+                                    : "text-[#6B7570] hover:text-[#2D7A4E] hover:bg-[#3D8B5E]/8"
+                                }`}
+                              >
+                                {isLeadSearching ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : hasPersonal ? (
+                                  <Users size={12} />
+                                ) : (
+                                  <UserPlus size={12} />
+                                )}
+                                {isLeadSearching ? "Searching..." : hasPersonal ? `${personalDMs.length} contact${personalDMs.length !== 1 ? "s" : ""}${genericDMs.length > 0 ? ` (+${genericDMs.length})` : ""}` : "Find Contact"}
+                              </button>
+                            );
+                          })()}
                           <button
                             onClick={(e) => handleSingleDelete(e, lead._id, lead.businessName)}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-xs text-[11px] font-medium text-[#8A9590] hover:text-[#C75555] hover:bg-[#C75555]/5 transition"
@@ -611,6 +695,33 @@ export default function LeadsPage() {
                             Website
                           </button>
                         )}
+                        {(() => {
+                          const isLeadSearching = isSearching(lead._id);
+                          const personalDMs = (lead.decisionMakers ?? []).filter((d) => !d.isGeneric);
+                          const genericDMs = (lead.decisionMakers ?? []).filter((d) => d.isGeneric);
+                          const hasPersonal = personalDMs.length > 0;
+                          return (
+                            <button
+                              onClick={(e) => handleFindContact(e, lead._id)}
+                              disabled={isLeadSearching}
+                              title={hasPersonal ? `${personalDMs.length} contact${personalDMs.length !== 1 ? "s" : ""}${genericDMs.length > 0 ? ` (+${genericDMs.length} generic)` : ""} — re-search` : "Find decision-makers"}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-xs text-[11px] font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                                hasPersonal
+                                  ? "text-[#3D8B5E] bg-[#3D8B5E]/10 active:bg-[#3D8B5E]/20"
+                                  : "text-[#3D5347] bg-[#F5F1EB] active:bg-[#EDE8E0]"
+                              }`}
+                            >
+                              {isLeadSearching ? (
+                                <Loader2 size={11} className="animate-spin shrink-0" />
+                              ) : hasPersonal ? (
+                                <Users size={11} className="shrink-0" />
+                              ) : (
+                                <UserPlus size={11} className="shrink-0" />
+                              )}
+                              {isLeadSearching ? "Searching..." : hasPersonal ? `${personalDMs.length}${genericDMs.length > 0 ? `+${genericDMs.length}` : ""}` : "Find Contact"}
+                            </button>
+                          );
+                        })()}
                         <button
                           onClick={(e) => handleSingleDelete(e, lead._id, lead.businessName)}
                           className="inline-flex items-center gap-1 px-2 py-1 rounded-xs text-[11px] font-medium text-[#C75555] bg-[#C75555]/5 active:bg-[#C75555]/10 transition"

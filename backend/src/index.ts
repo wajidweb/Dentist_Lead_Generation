@@ -9,6 +9,7 @@ import analysisRoutes from "./routes/analysisRoutes";
 import emailOutreachRoutes from "./routes/emailOutreachRoutes";
 import settingsRoutes from "./routes/settingsRoutes";
 import uniboxRoutes from "./routes/uniboxRoutes";
+import hunterRoutes from "./routes/hunterRoutes";
 import { startAnalysisWorker, stopAnalysisWorker } from "./jobs/analysisWorker";
 
 dotenv.config();
@@ -34,6 +35,7 @@ app.use("/api/analysis", analysisRoutes);
 app.use("/api/email-outreach", emailOutreachRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/unibox", uniboxRoutes);
+app.use("/api/hunter", hunterRoutes);
 app.get("/", (_req, res) => {
   res.json({ message: "DentalLeads API" });
 });

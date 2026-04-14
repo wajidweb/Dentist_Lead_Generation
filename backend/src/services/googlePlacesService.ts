@@ -174,7 +174,7 @@ async function getOrCreateProgress(location: string, userEmail: string) {
         updatedAt: new Date(),
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
 
   // If existing progress has fewer queries than current variations,
@@ -336,6 +336,12 @@ export async function getSearchHistory(userEmail: string) {
 
 export async function deleteSearchHistory(id: string, userEmail: string) {
   return SearchHistory.findOneAndDelete({ _id: id, userEmail });
+}
+
+export async function resetSearchProgress(location: string, userEmail: string) {
+  const normalized = location.toLowerCase().trim();
+  const result = await SearchProgress.deleteOne({ userEmail, location: normalized });
+  return result.deletedCount > 0;
 }
 
 export async function autocompleteCities(input: string): Promise<

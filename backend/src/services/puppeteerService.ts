@@ -31,6 +31,7 @@ export interface PuppeteerResult {
 // ---------------------------------------------------------------------------
 
 let browser: Browser | null = null;
+let fallbackBrowser: Browser | null = null;
 let jobCount = 0;
 
 const BROWSER_LAUNCH_ARGS = [
@@ -61,6 +62,18 @@ async function getBrowser(): Promise<Browser> {
   return browser;
 }
 
+/** Plain browser with NO adblocker plugin — used as fallback when the primary
+ *  browser's adblocker blocks the target page itself. */
+async function getFallbackBrowser(): Promise<Browser> {
+  if (!fallbackBrowser || !fallbackBrowser.connected) {
+    fallbackBrowser = await puppeteer.launch({
+      headless: true,
+      args: BROWSER_LAUNCH_ARGS,
+    });
+  }
+  return fallbackBrowser;
+}
+
 export async function closeBrowser(): Promise<void> {
   if (browser) {
     try {
@@ -69,6 +82,14 @@ export async function closeBrowser(): Promise<void> {
       // Browser may already be closed — ignore
     }
     browser = null;
+  }
+  if (fallbackBrowser) {
+    try {
+      await fallbackBrowser.close();
+    } catch {
+      // Browser may already be closed — ignore
+    }
+    fallbackBrowser = null;
   }
 }
 
@@ -127,21 +148,51 @@ function delay(ms: number): Promise<void> {
 
 /** Scroll down the page in steps to trigger lazy-loaded images. */
 async function scrollToTriggerLazyImages(page: Page): Promise<void> {
+  // Phase 1: progressive scroll — follows page growth caused by lazy content
   await page.evaluate(async () => {
-    const step = 300;
-    const delayMs = 100;
-    const maxHeight = document.body.scrollHeight;
+    const stepDelay = 300;
+    const maxIterations = 25;
+    let prevHeight = 0;
+    let stableCount = 0;
+    let y = 0;
 
-    for (let y = 0; y < maxHeight; y += step) {
+    for (let i = 0; i < maxIterations; i++) {
+      const currentHeight = document.body.scrollHeight;
+      const viewportH = window.innerHeight;
+      y = Math.min(y + viewportH, currentHeight);
       window.scrollTo(0, y);
-      await new Promise((r) => setTimeout(r, delayMs));
+      await new Promise((r) => setTimeout(r, stepDelay));
+
+      // Stop when height has been stable for 2 consecutive iterations AND we've
+      // reached the bottom of the page
+      if (currentHeight === prevHeight) {
+        stableCount++;
+        if (stableCount >= 2 && y >= currentHeight) break;
+      } else {
+        stableCount = 0;
+      }
+      prevHeight = currentHeight;
     }
 
-    // Scroll back to top
     window.scrollTo(0, 0);
   });
 
-  // Brief pause to let images start loading
+  // Phase 2: wait for all <img> elements to finish loading (hard cap 5s)
+  try {
+    await page.waitForFunction(
+      () => {
+        const imgs = Array.from(document.querySelectorAll("img"));
+        if (imgs.length === 0) return true;
+        // Treat complete (loaded or errored) as done so broken sources don't hang
+        return imgs.every((img) => img.complete);
+      },
+      { timeout: 5000, polling: 250 }
+    );
+  } catch {
+    // Some images may never load (broken sources) — proceed anyway
+  }
+
+  // Phase 3: small settle delay for any final paint/layout
   await delay(500);
 }
 
@@ -182,137 +233,6 @@ async function runDomChecks(page: Page): Promise<PuppeteerResult["domChecks"]> {
     imageCount: document.querySelectorAll("img").length,
     navigationItemCount: document.querySelectorAll("nav a, header a").length,
   }));
-}
-
-// ---------------------------------------------------------------------------
-// Email extraction
-// ---------------------------------------------------------------------------
-
-const JUNK_EMAIL_PATTERNS = [
-  /^(noreply|no-reply|donotreply|do-not-reply|wordpress|woocommerce|webmaster)@/i,
-  /^(example|test|sample|your|name|email|user)@/i,
-  /@(example|test|sentry|wixpress|w3\.org)\./i,
-  /\.(png|jpg|jpeg|gif|svg|webp|css|js|woff|woff2|ttf|eot)$/i,
-];
-
-function isJunkEmail(email: string): boolean {
-  return JUNK_EMAIL_PATTERNS.some((p) => p.test(email));
-}
-
-/** Extract emails from a single page: mailto links + regex scan of HTML + JSON-LD */
-async function extractEmailsFromPage(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const found = new Set<string>();
-
-    // 1. mailto: links
-    document.querySelectorAll('a[href^="mailto:"]').forEach((el) => {
-      const href = el.getAttribute("href") || "";
-      const email = href.replace(/^mailto:/i, "").split("?")[0].trim().toLowerCase();
-      if (email && email.includes("@")) found.add(email);
-    });
-
-    // 2. Regex scan of full HTML (catches obfuscated and text-only emails)
-    const html = document.documentElement.innerHTML;
-    // Decode common HTML entity for @
-    const decoded = html.replace(/&#64;/g, "@").replace(/&commat;/g, "@");
-    const regex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
-    let match;
-    while ((match = regex.exec(decoded)) !== null) {
-      found.add(match[0].toLowerCase());
-    }
-
-    // 3. JSON-LD structured data
-    document.querySelectorAll('script[type="application/ld+json"]').forEach((el) => {
-      try {
-        const data = JSON.parse(el.textContent || "");
-        const check = (obj: any) => {
-          if (!obj || typeof obj !== "object") return;
-          if (typeof obj.email === "string" && obj.email.includes("@")) {
-            found.add(obj.email.toLowerCase());
-          }
-          if (Array.isArray(obj)) obj.forEach(check);
-          else Object.values(obj).forEach(check);
-        };
-        check(data);
-      } catch {
-        // invalid JSON-LD — skip
-      }
-    });
-
-    return Array.from(found);
-  });
-}
-
-/** Find contact/about page links from the current page */
-async function findSubPageUrls(page: Page, baseUrl: string): Promise<string[]> {
-  const links = await page.evaluate(() => {
-    const anchors = Array.from(document.querySelectorAll("a[href]"));
-    return anchors.map((a) => a.getAttribute("href") || "");
-  });
-
-  const base = new URL(baseUrl);
-  const subPages: string[] = [];
-  const seen = new Set<string>();
-  const patterns = [/\/contact/i, /\/about/i, /\/team/i, /\/staff/i, /\/our-team/i, /\/meet/i];
-
-  for (const href of links) {
-    try {
-      const resolved = new URL(href, base);
-      // Only same-origin links
-      if (resolved.hostname !== base.hostname) continue;
-      const path = resolved.pathname.toLowerCase();
-      if (patterns.some((p) => p.test(path)) && !seen.has(resolved.pathname)) {
-        seen.add(resolved.pathname);
-        subPages.push(resolved.href);
-      }
-    } catch {
-      // invalid URL — skip
-    }
-  }
-
-  return subPages.slice(0, 3); // Max 3 sub-pages to avoid spending too long
-}
-
-/** Full email extraction: homepage + sub-pages */
-async function scrapeEmails(page: Page, url: string): Promise<string[]> {
-  const allEmails = new Set<string>();
-
-  // Extract from current page (homepage)
-  const homeEmails = await extractEmailsFromPage(page);
-  homeEmails.forEach((e) => allEmails.add(e));
-
-  // Find and visit sub-pages (contact, about, team)
-  const subPageUrls = await findSubPageUrls(page, url);
-  for (const subUrl of subPageUrls) {
-    try {
-      await page.goto(subUrl, { waitUntil: "networkidle2", timeout: 10000 });
-      await delay(500);
-      const subEmails = await extractEmailsFromPage(page);
-      subEmails.forEach((e) => allEmails.add(e));
-    } catch {
-      // Sub-page failed — non-critical, continue
-    }
-  }
-
-  // Filter out junk
-  const cleaned = Array.from(allEmails).filter((e) => !isJunkEmail(e));
-
-  // Sort: prefer branded domain emails over gmail/yahoo, then prefer info@/office@/contact@ first
-  const domain = new URL(url).hostname.replace(/^www\./, "");
-  cleaned.sort((a, b) => {
-    const aDomain = a.includes(domain) ? 0 : 1;
-    const bDomain = b.includes(domain) ? 0 : 1;
-    if (aDomain !== bDomain) return aDomain - bDomain;
-    // Prefer common practice prefixes
-    const prefixOrder = ["info@", "office@", "contact@", "hello@", "reception@", "appointments@"];
-    const aPrefix = prefixOrder.findIndex((p) => a.startsWith(p));
-    const bPrefix = prefixOrder.findIndex((p) => b.startsWith(p));
-    const aRank = aPrefix >= 0 ? aPrefix : 99;
-    const bRank = bPrefix >= 0 ? bPrefix : 99;
-    return aRank - bRank;
-  });
-
-  return cleaned;
 }
 
 // ---------------------------------------------------------------------------
@@ -359,10 +279,12 @@ export async function analyzePage(url: string): Promise<PuppeteerResult> {
       const isBlocked = errMsg.includes("ERR_BLOCKED_BY_CLIENT");
 
       if (isBlocked && adblockerEnabled) {
-        // Adblocker blocked the main page — retry without it
-        console.warn(`[Puppeteer] Adblocker blocked ${url} — retrying without adblocker`);
+        // Adblocker blocked the main page — retry using the plain fallback
+        // browser (no adblocker plugin attached at browser level).
+        console.warn(`[Puppeteer] Adblocker blocked ${url} — retrying with plain fallback browser`);
         await page.close();
-        page = await instance.newPage(); // Fresh page, no adblocker
+        const plainBrowser = await getFallbackBrowser();
+        page = await plainBrowser.newPage();
         await page.setViewport({ width: 1280, height: 800 });
         const retryStart = Date.now();
         try {
@@ -432,16 +354,6 @@ export async function analyzePage(url: string): Promise<PuppeteerResult> {
     const domChecks = await runDomChecks(page);
     console.log(`[Puppeteer] Done — text=${pageText.length} chars, images=${domChecks.imageCount}, form=${domChecks.hasContactForm}, booking=${domChecks.hasBookingWidget}`);
 
-    // Email scraping (homepage + contact/about sub-pages)
-    console.log(`[Puppeteer] Scraping emails from homepage + sub-pages...`);
-    let emails: string[] = [];
-    try {
-      emails = await scrapeEmails(page, url);
-      console.log(`[Puppeteer] Emails found: ${emails.length > 0 ? emails.join(", ") : "none"}`);
-    } catch (err) {
-      console.warn("[Puppeteer] Email scraping failed (non-critical):", err);
-    }
-
     // -----------------------------------------------------------------------
     // Cleanup
     // -----------------------------------------------------------------------
@@ -463,7 +375,7 @@ export async function analyzePage(url: string): Promise<PuppeteerResult> {
       pageText,
       loadTimeMs,
       isHttps,
-      emails,
+      emails: [],
       domChecks,
     };
   } catch (error) {

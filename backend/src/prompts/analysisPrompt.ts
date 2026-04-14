@@ -271,6 +271,16 @@ export const ANALYSIS_RESPONSE_SCHEMA = {
       maxItems: 7,
     },
     one_line_summary: { type: "string" },
+    likely_owner: {
+      type: ["object", "null"],
+      properties: {
+        first_name: { type: "string" },
+        last_name: { type: "string" },
+        position: { type: "string" },
+      },
+      required: ["first_name", "last_name"],
+      additionalProperties: false,
+    },
   },
   required: [
     "visual_category",
@@ -283,6 +293,7 @@ export const ANALYSIS_RESPONSE_SCHEMA = {
     "critical_missing",
     "issues_list",
     "one_line_summary",
+    "likely_owner",
   ],
   additionalProperties: false,
 } as const;
@@ -513,5 +524,23 @@ Finally, write a one_line_summary: A single sentence summarizing the website's o
 and the biggest opportunity for improvement. This should be punchy and specific.
 
 Example: "Outdated 2014-era design with no mobile responsiveness, no online booking, and no
-patient testimonials despite excellent Google reviews — strong redesign opportunity."`;
+patient testimonials despite excellent Google reviews — strong redesign opportunity."
+
+PART 4 — OWNER / LEAD DENTIST IDENTIFICATION
+
+Identify the ONE primary or founding dentist who owns or leads this practice. This name will
+be used to find their email address via a name-based lookup, so accuracy matters.
+
+RULES:
+- Return exactly ONE person — the primary/founding/owner dentist only.
+- Include their professional position if clearly visible on the page (e.g., "DDS", "DMD",
+  "Endodontist", "Periodontist", "Orthodontist"). Omit position if not shown.
+- Look primarily on About, Team, Meet the Doctor, and bio sections of the page text.
+- If multiple dentists are listed and one is clearly identified as the founder, owner, or
+  practice namesake, choose that person.
+- If you cannot confidently identify a single primary dentist (e.g., large group practice
+  with no clear lead, or no doctor information at all), return null.
+- Ignore non-dentist staff: hygienists, dental assistants, office managers, receptionists.
+- Do NOT guess or infer names from the practice name alone (e.g., "Smith Dental" does not
+  mean the owner is named Smith).`;
 }

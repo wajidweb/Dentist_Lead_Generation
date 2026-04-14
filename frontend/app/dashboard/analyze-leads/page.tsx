@@ -561,7 +561,7 @@ export default function AnalyzeLeadsPage() {
                             <span className="flex items-center gap-1 text-[11px] text-[#6B7570]">
                               <Star size={10} fill="#facc15" stroke="#facc15" />
                               <span className="font-semibold text-[#1A2E22] tabular-nums">{lead.googleRating}</span>
-                              <span className="text-[#B5AFA5] tabular-nums">({lead.googleReviewCount.toLocaleString()})</span>
+                              <span className="text-[#B5AFA5] tabular-nums">({(lead.googleReviewCount ?? 0).toLocaleString()})</span>
                             </span>
                             {lead.website && (
                               <a
@@ -671,7 +671,7 @@ export default function AnalyzeLeadsPage() {
                             <span className="flex items-center gap-1 shrink-0">
                               <Star size={10} fill="#facc15" stroke="#facc15" />
                               <span className="font-semibold text-[#1A2E22] tabular-nums">{lead.googleRating}</span>
-                              <span className="text-[#B5AFA5] tabular-nums">({lead.googleReviewCount.toLocaleString()})</span>
+                              <span className="text-[#B5AFA5] tabular-nums">({(lead.googleReviewCount ?? 0).toLocaleString()})</span>
                             </span>
                           </div>
 
