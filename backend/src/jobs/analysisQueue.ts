@@ -17,15 +17,19 @@ export const analysisQueue = new Queue("website-analysis", {
   },
 });
 
+export type EmailProvider = "harvester" | "hunter";
+
 export interface AnalysisJobData {
   leadId: string;
   websiteUrl: string;
   groupId: string;
+  emailProvider: EmailProvider;
 }
 
 export async function addAnalysisJobs(
   leads: Array<{ leadId: string; websiteUrl: string }>,
-  groupId: string
+  groupId: string,
+  emailProvider: EmailProvider = "harvester"
 ) {
   const jobs = leads.map((lead) => ({
     name: "analyze-website",
@@ -33,6 +37,7 @@ export async function addAnalysisJobs(
       leadId: lead.leadId,
       websiteUrl: lead.websiteUrl,
       groupId,
+      emailProvider,
     } as AnalysisJobData,
     opts: {
       jobId: `analysis-${lead.leadId}-${groupId}`,

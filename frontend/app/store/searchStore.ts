@@ -54,6 +54,7 @@ interface SearchStore {
   fetchSearchHistory: () => Promise<void>;
   deleteSearchHistory: (id: string) => Promise<void>;
   clearResults: () => void;
+  resetSearchProgress: (location: string) => Promise<boolean>;
 }
 
 export const useSearchStore = create<SearchStore>((set) => ({
@@ -110,4 +111,18 @@ export const useSearchStore = create<SearchStore>((set) => ({
   },
 
   clearResults: () => set({ results: null, error: null }),
+
+  resetSearchProgress: async (location) => {
+    try {
+      const res = await apiFetch("/search/reset-progress", {
+        method: "POST",
+        body: JSON.stringify({ location }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json() as { reset: boolean; location: string };
+      return data.reset;
+    } catch {
+      return false;
+    }
+  },
 }));

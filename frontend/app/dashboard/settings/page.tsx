@@ -12,8 +12,12 @@ import {
   Shield,
   Circle,
   Trash2,
+  Users,
+  Search,
+  BarChart2,
 } from "lucide-react";
 import { useSettingsStore, EmailAccount } from "../../store/settingsStore";
+import { useHunterStore } from "../../store/hunterStore";
 
 function getStatusInfo(status?: number): {
   label: string;
@@ -184,11 +188,14 @@ export default function SettingsPage() {
     deleteEmailAccount,
   } = useSettingsStore();
 
+  const { quota, quotaLoading, fetchQuota } = useHunterStore();
+
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     fetchEmailAccounts();
+    fetchQuota();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -308,6 +315,122 @@ export default function SettingsPage() {
                   />
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Hunter.io Section */}
+      <div className="bg-white rounded-xs border border-[#E8E2D8] overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#EDE8E0]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[#3D8B5E]/10 flex items-center justify-center">
+              <Users size={16} className="text-[#3D8B5E]" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-[#1A2E22]">Hunter.io — Decision Maker Search</h2>
+              <p className="text-[11px] text-[#6B7570] mt-0.5">
+                Find named contacts (owners, office managers) for each dental practice
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={fetchQuota}
+            disabled={quotaLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xs text-xs font-medium border border-[#D8D2C8] text-[#5A6B60] hover:bg-[#F5F1EB] hover:border-[#CCC8C0] transition-all disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={quotaLoading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
+
+        <div className="p-5">
+          {quotaLoading && !quota ? (
+            <div className="flex items-center justify-center py-8 gap-2">
+              <Loader2 size={20} className="animate-spin text-[#3D8B5E]" />
+              <span className="text-sm text-[#6B7570]">Loading quota...</span>
+            </div>
+          ) : quota ? (
+            <div className="space-y-4">
+              {/* Plan badge */}
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-[#3D8B5E] animate-pulse" />
+                <span className="text-sm text-[#1A2E22] font-medium">Hunter.io</span>
+                <span className="text-xs text-[#6B7570] bg-[#F5F1EB] px-2 py-0.5 rounded-xs capitalize">
+                  {quota.plan} plan
+                </span>
+              </div>
+
+              {/* Quota bars */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Searches */}
+                <div className="bg-[#F5F1EB] rounded-xs p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Search size={13} className="text-[#3D8B5E]" />
+                    <span className="text-xs font-semibold text-[#1A2E22]">Domain Searches</span>
+                  </div>
+                  <div className="flex items-end justify-between mb-1.5">
+                    <span className="text-2xl font-bold text-[#1A2E22] tabular-nums">
+                      {quota.searches.used}
+                    </span>
+                    <span className="text-xs text-[#6B7570] tabular-nums">
+                      / {quota.searches.used + quota.searches.available} total
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-[#E8E2D8] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#3D8B5E] rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, Math.round((quota.searches.used / (quota.searches.used + quota.searches.available || 1)) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-[#8A9590] mt-1 tabular-nums">
+                    {quota.searches.available} remaining
+                  </p>
+                </div>
+
+                {/* Verifications */}
+                <div className="bg-[#F5F1EB] rounded-xs p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <BarChart2 size={13} className="text-[#3D8B5E]" />
+                    <span className="text-xs font-semibold text-[#1A2E22]">Email Verifications</span>
+                  </div>
+                  <div className="flex items-end justify-between mb-1.5">
+                    <span className="text-2xl font-bold text-[#1A2E22] tabular-nums">
+                      {quota.verifications.used}
+                    </span>
+                    <span className="text-xs text-[#6B7570] tabular-nums">
+                      / {quota.verifications.used + quota.verifications.available} total
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-[#E8E2D8] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#3D8B5E] rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, Math.round((quota.verifications.used / (quota.verifications.used + quota.verifications.available || 1)) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-[#8A9590] mt-1 tabular-nums">
+                    {quota.verifications.available} remaining
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-[#8A9590]">
+                API key is configured server-side via the HUNTER_API_KEY environment variable.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+              <div className="w-10 h-10 rounded-full bg-[#F5F1EB] flex items-center justify-center">
+                <Users size={18} className="text-[#8A9590]" />
+              </div>
+              <p className="text-sm font-medium text-[#1A2E22]">Hunter.io not connected</p>
+              <p className="text-xs text-[#6B7570] max-w-xs">
+                Set the HUNTER_API_KEY environment variable on the server to enable decision-maker search.
+              </p>
             </div>
           )}
         </div>

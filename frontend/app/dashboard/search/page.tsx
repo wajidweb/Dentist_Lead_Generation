@@ -8,7 +8,7 @@ import { useSearchStore } from "../../store/searchStore";
 import CityAutocomplete from "../../components/CityAutocomplete";
 
 export default function SearchPage() {
-  const { results, history, loading, historyLoading, error, searchDentists, fetchSearchHistory, deleteSearchHistory, clearResults } = useSearchStore();
+  const { results, history, loading, historyLoading, error, searchDentists, fetchSearchHistory, deleteSearchHistory, clearResults, resetSearchProgress } = useSearchStore();
 
   const [location, setLocation] = useState("");
   const [minRating, setMinRating] = useState("3.5");
@@ -16,6 +16,7 @@ export default function SearchPage() {
   const [targetLeads, setTargetLeads] = useState("20");
   const [mounted, setMounted] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; location: string } | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     fetchSearchHistory();
@@ -34,6 +35,28 @@ export default function SearchPage() {
     }).then(() => {
       const { results, error } = useSearchStore.getState();
       if (results) toast.success(`Found ${results.leadsCreated} leads in ${results.location}`);
+      if (error) toast.error(error);
+    });
+  };
+
+  const handleResetAndSearch = async () => {
+    if (!results) return;
+    setResetting(true);
+    const didReset = await resetSearchProgress(results.location);
+    setResetting(false);
+    if (!didReset) {
+      toast.error("Could not reset search progress. Please try again.");
+      return;
+    }
+    toast.success(`Search progress reset for ${results.location}`);
+    searchDentists({
+      location: results.location,
+      minRating: Number(minRating),
+      minReviews: Number(minReviews),
+      targetLeads: Number(targetLeads),
+    }).then(() => {
+      const { results: newResults, error } = useSearchStore.getState();
+      if (newResults) toast.success(`Found ${newResults.leadsCreated} leads in ${newResults.location}`);
       if (error) toast.error(error);
     });
   };
@@ -186,6 +209,26 @@ export default function SearchPage() {
                   </span>
                 )}
               </div>
+
+              {/* Exhausted-location notice */}
+              {results.leadsCreated === 0 && results.totalFromGoogle === 0 && (
+                <div className="mb-3 flex flex-wrap items-center gap-3 px-3 py-2.5 rounded-xs bg-[#C47A4A]/8 border border-[#C47A4A]/20">
+                  <p className="text-xs text-[#5A6B60] flex-1 min-w-0">
+                    No new leads found — all search queries for this location have been used.
+                  </p>
+                  <button
+                    onClick={handleResetAndSearch}
+                    disabled={resetting || loading}
+                    className="shrink-0 text-xs font-semibold text-white px-3 py-1.5 rounded-xs bg-[#3D8B5E] hover:bg-[#2D7A4E] transition disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {resetting ? (
+                      <><Loader2 size={12} className="animate-spin" />Resetting...</>
+                    ) : (
+                      "Reset & try again"
+                    )}
+                  </button>
+                </div>
+              )}
 
               {/* Action buttons */}
               <div className="flex flex-wrap gap-2">

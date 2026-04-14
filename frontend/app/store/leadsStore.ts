@@ -63,6 +63,7 @@ export interface Lead {
   googleReviewCount: number;
   reviews: Review[];
   email?: string;
+  allEmailsFound?: string[];
   emailSource?: string;
   websiteAnalysis?: WebsiteAnalysis;
   websiteQualityScore?: number;
@@ -77,6 +78,26 @@ export interface Lead {
   analysisGroupId?: string;
   analyzedAt?: string;
   notes?: string;
+  decisionMakers?: Array<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    position: string | null;
+    confidence: number;
+    source: "hunter-domain" | "hunter-finder" | "manual";
+    verified: boolean;
+    verificationStatus: "deliverable" | "risky" | "undeliverable" | "unknown";
+    verifiedAt: string | null;
+    discoveredAt: string;
+    isGeneric?: boolean;
+  }>;
+  likelyOwner?: {
+    firstName: string;
+    lastName: string;
+    position?: string;
+    source: "claude-analysis" | "manual" | "google-places";
+  };
+  hunterSearchedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -132,13 +153,14 @@ interface LeadsStore {
   clearCurrentLead: () => void;
   bulkDeleteLeads: (ids: string[]) => Promise<number>;
   bulkUpdateStatus: (ids: string[], status: string) => Promise<number>;
-  startAnalysis: (ids: string[]) => Promise<{ groupId: string; totalJobs: number } | null>;
+  startAnalysis: (ids: string[], emailProvider?: "harvester" | "hunter") => Promise<{ groupId: string; totalJobs: number } | null>;
   getAnalysisStatus: (groupId: string) => Promise<AnalysisStatus | null>;
   retryFailedAnalysis: (groupId: string) => Promise<number>;
   cancelAnalysis: (groupId: string) => Promise<number>;
   setActiveGroup: (groupId: string | null, progress?: AnalysisStatus | null) => void;
   restoreActiveGroup: () => Promise<void>;
   exportLeads: (params: Record<string, string | number | undefined>, format: "csv" | "xlsx" | "json", selectedIds?: string[]) => Promise<boolean>;
+  updateLead: (id: string, data: Record<string, unknown>) => Promise<void>;
 }
 
 export const useLeadsStore = create<LeadsStore>((set, get) => ({
@@ -311,11 +333,11 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
     }
   },
 
-  startAnalysis: async (ids) => {
+  startAnalysis: async (ids, emailProvider = "harvester") => {
     try {
       const res = await apiFetch("/analysis/start", {
         method: "POST",
-        body: JSON.stringify({ leadIds: ids }),
+        body: JSON.stringify({ leadIds: ids, emailProvider }),
       });
       const data = await res.json();
       if (!res.ok) return null;
@@ -413,6 +435,33 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
     } catch {
       localStorage.removeItem("analysisGroupId");
     }
+  },
+
+  updateLead: async (id, data) => {
+    const token = localStorage.getItem("token");
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+    const res = await fetch(`${API_URL}/leads/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as { message?: string }).message || `Failed to update lead (${res.status})`);
+    }
+    const resData = await res.json();
+    const updatedLead = resData.lead as Lead;
+    const { leads, currentLead } = get();
+    const idx = leads.findIndex((l) => l._id === updatedLead._id);
+    const newLeads = [...leads];
+    if (idx !== -1) newLeads[idx] = updatedLead;
+    set({
+      leads: newLeads,
+      currentLead: currentLead?._id === updatedLead._id ? updatedLead : currentLead,
+    });
   },
 
   exportLeads: async (params, format, selectedIds) => {

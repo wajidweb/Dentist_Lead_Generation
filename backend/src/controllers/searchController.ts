@@ -4,6 +4,7 @@ import {
   getSearchHistory,
   deleteSearchHistory,
   autocompleteCities as autocompleteCitiesService,
+  resetSearchProgress,
 } from "../services/googlePlacesService";
 
 export const search = async (req: Request, res: Response) => {
@@ -62,6 +63,22 @@ export const deleteHistory = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Delete history error:", error);
     res.status(500).json({ message: "Failed to delete search history" });
+  }
+};
+
+export const resetProgress = async (req: Request, res: Response) => {
+  try {
+    const { location } = req.body as { location?: string };
+    if (!location || !location.trim()) {
+      res.status(400).json({ message: "Location is required" });
+      return;
+    }
+    const userEmail = req.userEmail!;
+    const reset = await resetSearchProgress(location.trim(), userEmail);
+    res.json({ reset, location: location.trim() });
+  } catch (error) {
+    console.error("Reset progress error:", error);
+    res.status(500).json({ message: "Failed to reset search progress" });
   }
 };
 

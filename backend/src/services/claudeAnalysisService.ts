@@ -48,6 +48,7 @@ export interface ClaudeAnalysisResult {
   criticalMissing: string[];
   issuesList: string[];
   oneLineSummary: string;
+  likelyOwner: { firstName: string; lastName: string; position?: string } | null;
 }
 
 interface AnalyzeParams {
@@ -115,6 +116,13 @@ function mapResponse(raw: Record<string, unknown>): ClaudeAnalysisResult {
     criticalMissing: r.critical_missing || [],
     issuesList: r.issues_list || [],
     oneLineSummary: r.one_line_summary || "",
+    likelyOwner: r.likely_owner
+      ? {
+          firstName: r.likely_owner.first_name,
+          lastName: r.likely_owner.last_name,
+          position: r.likely_owner.position ?? undefined,
+        }
+      : null,
   };
 }
 

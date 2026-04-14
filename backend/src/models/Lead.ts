@@ -1,5 +1,26 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export interface ILikelyOwner {
+  firstName: string;
+  lastName: string;
+  position?: string;
+  source: "claude-analysis" | "manual" | "google-places";
+}
+
+export interface IDecisionMaker {
+  firstName: string;
+  lastName: string;
+  email: string;
+  position: string | null;
+  confidence: number;
+  source: "hunter-domain" | "hunter-finder" | "manual";
+  verified: boolean;
+  verificationStatus: "deliverable" | "risky" | "undeliverable" | "unknown";
+  verifiedAt: Date | null;
+  discoveredAt: Date;
+  isGeneric?: boolean;
+}
+
 export interface IReview {
   author: string;
   rating: number;
@@ -107,7 +128,8 @@ export interface ILead extends Document {
   googleReviewCount: number;
   reviews: IReview[];
   email?: string;
-  emailSource?: "scrape" | "domain-search" | "hunter" | "outscraper" | "manual";
+  allEmailsFound?: string[];
+  emailSource?: "scrape" | "harvester" | "domain-search" | "hunter" | "outscraper" | "manual";
   emailVerified?: boolean;
   emailVerificationStatus?: "deliverable" | "risky" | "undeliverable";
   websiteAnalysis?: IWebsiteAnalysis;
@@ -137,11 +159,40 @@ export interface ILead extends Document {
   instantlyLeadId?: string;
   outreachStatus?: "pending" | "sent" | "opened" | "replied" | "bounced";
   lastOutreachAt?: Date;
+  likelyOwner?: ILikelyOwner;
+  decisionMakers: IDecisionMaker[];
+  hunterSearchedAt?: Date;
+  hunterQuotaUsed?: number;
   searchQuery: string;
   searchId: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const decisionMakerSchema = new Schema<IDecisionMaker>(
+  {
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    email: { type: String, required: true },
+    position: { type: String, default: null },
+    confidence: { type: Number, required: true },
+    source: {
+      type: String,
+      enum: ["hunter-domain", "hunter-finder", "manual"],
+      required: true,
+    },
+    verified: { type: Boolean, default: false },
+    verificationStatus: {
+      type: String,
+      enum: ["deliverable", "risky", "undeliverable", "unknown"],
+      default: "unknown",
+    },
+    verifiedAt: { type: Date, default: null },
+    discoveredAt: { type: Date, required: true },
+    isGeneric: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
 
 const reviewSchema = new Schema<IReview>(
   {
@@ -221,6 +272,20 @@ const websiteAnalysisSchema = new Schema(
   { _id: false }
 );
 
+const likelyOwnerSchema = new Schema<ILikelyOwner>(
+  {
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    position: { type: String },
+    source: {
+      type: String,
+      enum: ["claude-analysis", "manual", "google-places"],
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
 const leadSchema = new Schema<ILead>(
   {
     businessName: { type: String, required: true },
@@ -236,9 +301,10 @@ const leadSchema = new Schema<ILead>(
     googleReviewCount: { type: Number, required: true },
     reviews: [reviewSchema],
     email: { type: String },
+    allEmailsFound: [{ type: String }],
     emailSource: {
       type: String,
-      enum: ["scrape", "domain-search", "hunter", "outscraper", "manual"],
+      enum: ["scrape", "harvester", "domain-search", "hunter", "outscraper", "manual"],
     },
     emailVerified: { type: Boolean },
     emailVerificationStatus: {
@@ -287,6 +353,10 @@ const leadSchema = new Schema<ILead>(
       enum: ["pending", "sent", "opened", "replied", "bounced"],
     },
     lastOutreachAt: { type: Date },
+    likelyOwner: { type: likelyOwnerSchema, default: undefined },
+    decisionMakers: { type: [decisionMakerSchema], default: [] },
+    hunterSearchedAt: { type: Date },
+    hunterQuotaUsed: { type: Number },
     searchQuery: { type: String, required: true },
     searchId: { type: Schema.Types.ObjectId, ref: "SearchHistory", required: true },
   },

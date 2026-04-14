@@ -91,9 +91,12 @@ export async function sendOutreach(
   const lead = await Lead.findById(leadId);
   if (!lead) throw new Error("Lead not found");
 
-  // Use overridden "to" email if provided, otherwise fall back to lead's email
-  const recipientEmail = toOverride?.trim() || lead.email;
-  if (!recipientEmail) throw new Error("Lead has no email address");
+  // Parse recipient emails — support comma-separated list for multi-send
+  const rawEmails = (toOverride?.trim() || lead.email || "")
+    .split(",")
+    .map((e: string) => e.trim())
+    .filter(Boolean);
+  if (rawEmails.length === 0) throw new Error("Lead has no email address");
 
   // Use overridden "from" email if provided, otherwise fall back to campaign default
   const campaign = await getOrCreateCampaign(userEmail, fromOverride?.trim());
@@ -121,37 +124,42 @@ export async function sendOutreach(
     critical_missing: criticalBullets,
   };
 
-  const result = await instantlyService.addLeadToCampaign(
-    campaign.instantlyCampaignId,
-    recipientEmail,
-    variables
-  );
+  // Send to each email separately (Instantly requires one email per request)
+  let lastInstantlyLeadId = "";
+  for (const recipientEmail of rawEmails) {
+    console.log(`[Outreach] Sending to ${recipientEmail} for ${lead.businessName}`);
+    const result = await instantlyService.addLeadToCampaign(
+      campaign.instantlyCampaignId,
+      recipientEmail,
+      variables
+    );
+    lastInstantlyLeadId = result.id;
+  }
 
-  const instantlyLeadId = result.id;
   const now = new Date();
 
-  // If a different email was used for sending, update the lead's email so webhooks can find it
-  if (recipientEmail !== lead.email) {
-    lead.email = recipientEmail;
+  // Update lead with the primary (first) email used
+  if (rawEmails[0] !== lead.email) {
+    lead.email = rawEmails[0];
   }
   lead.status = "email_sent";
   lead.outreachStatus = "sent";
   lead.lastOutreachAt = now;
   lead.instantlyCampaignId = campaign.instantlyCampaignId;
-  lead.instantlyLeadId = instantlyLeadId;
+  lead.instantlyLeadId = lastInstantlyLeadId;
   lead.emailHistory.push({
     sentAt: now,
     templateName: "instantly-outreach",
     subject,
     body,
     status: "sent",
-    instantlyEmailId: instantlyLeadId,
+    instantlyEmailId: lastInstantlyLeadId,
   });
   await lead.save();
 
   // Update campaign counters
   await Campaign.findByIdAndUpdate(campaign._id, {
-    $inc: { leadsAdded: 1, emailsSent: 1 },
+    $inc: { leadsAdded: rawEmails.length, emailsSent: rawEmails.length },
   });
 
   return {

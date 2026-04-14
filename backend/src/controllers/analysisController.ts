@@ -1,11 +1,11 @@
 import { Request, Response } from "express";
 import Lead from "../models/Lead";
 import AnalysisGroup from "../models/AnalysisGroup";
-import { addAnalysisJobs, analysisQueue } from "../jobs/analysisQueue";
+import { addAnalysisJobs, analysisQueue, EmailProvider } from "../jobs/analysisQueue";
 
 export const startBatch = async (req: Request, res: Response) => {
   try {
-    const { leadIds } = req.body;
+    const { leadIds, emailProvider = "harvester" } = req.body as { leadIds?: string[]; emailProvider?: EmailProvider };
     if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
       res.status(400).json({ message: "leadIds array is required" });
       return;
@@ -47,7 +47,7 @@ export const startBatch = async (req: Request, res: Response) => {
       leadId: l._id.toString(),
       websiteUrl: l.website,
     }));
-    await addAnalysisJobs(jobData, group._id.toString());
+    await addAnalysisJobs(jobData, group._id.toString(), emailProvider);
 
     res.json({
       groupId: group._id.toString(),

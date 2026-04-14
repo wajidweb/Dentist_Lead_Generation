@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useLeadsStore } from "../../../store/leadsStore";
 import { useEmailOutreachStore } from "../../../store/emailOutreachStore";
+import { useHunterStore } from "../../../store/hunterStore";
 import { EmailPreviewModal } from "../../../components/EmailPreviewModal";
 import { EmailTrackingTab } from "../../../components/EmailTrackingTab";
 import {
@@ -24,6 +25,13 @@ import {
   AlertCircle,
   Zap,
   Send,
+  Users,
+  Search,
+  ShieldCheck,
+  Loader2,
+  User,
+  Pencil,
+  X,
 } from "lucide-react";
 
 const pipelineSteps = [
@@ -49,11 +57,22 @@ function copyToClipboard(text: string, label: string) {
 export default function LeadDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { currentLead: lead, detailLoading, fetchLeadDetail, updateLeadStatus, clearCurrentLead } = useLeadsStore();
+  const { currentLead: lead, detailLoading, fetchLeadDetail, updateLeadStatus, clearCurrentLead, updateLead } = useLeadsStore();
   const { openPreviewModal } = useEmailOutreachStore();
+  const { isSearching, verifying, error: hunterError, searchDecisionMakers, findEmail, verifyEmail, clearError } = useHunterStore();
   const [mounted, setMounted] = useState(false);
+  const [finderFirstName, setFinderFirstName] = useState("");
+  const [finderLastName, setFinderLastName] = useState("");
+  const [ownerEditing, setOwnerEditing] = useState(false);
+  const [ownerFirst, setOwnerFirst] = useState("");
+  const [ownerLast, setOwnerLast] = useState("");
+  const [ownerPosition, setOwnerPosition] = useState("");
+  const [ownerSaving, setOwnerSaving] = useState(false);
+  const [showGenerics, setShowGenerics] = useState(false);
+  const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
 
   const id = params.id as string;
+  const searching = isSearching(id);
 
   useEffect(() => {
     if (id) fetchLeadDetail(id);
@@ -67,6 +86,78 @@ export default function LeadDetailPage() {
   const handleStatusChange = (newStatus: string) => {
     updateLeadStatus(id, newStatus);
     toast.success(`Status updated to ${newStatus.replace("_", " ")}`);
+  };
+
+  const handleSearchDecisionMakers = async () => {
+    const result = await searchDecisionMakers(id);
+    if (result) {
+      const { personalCount: p, genericCount: g } = result;
+      if (p > 0 && g === 0) toast.success(`${p} decision-maker(s) found`);
+      else if (p > 0 && g > 0) toast.success(`${p} decision-maker(s) found (${g} generic hidden)`);
+      else if (p === 0 && g > 0) toast(`Only ${g} generic inbox(es) found — no named contacts`, { icon: "⚠️" });
+      else toast(`No decision-makers found`, { icon: "ℹ️" });
+    } else {
+      toast.error(hunterError || "Search failed");
+    }
+    clearError();
+  };
+
+  const handleFindEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!finderFirstName.trim() || !finderLastName.trim()) return;
+    const result = await findEmail(id, finderFirstName.trim(), finderLastName.trim());
+    if (result) {
+      const { personalCount: p, genericCount: g } = result;
+      if (p > 0 && g === 0) toast.success(`${p} decision-maker(s) found`);
+      else if (p > 0 && g > 0) toast.success(`${p} decision-maker(s) found (${g} generic hidden)`);
+      else if (p === 0 && g > 0) toast(`Only ${g} generic inbox(es) found — no named contacts`, { icon: "⚠️" });
+      else toast(`No decision-makers found`, { icon: "ℹ️" });
+      setFinderFirstName("");
+      setFinderLastName("");
+    } else {
+      toast.error(hunterError || "Email not found");
+    }
+    clearError();
+  };
+
+  const handleVerifyEmail = async (email: string) => {
+    const ok = await verifyEmail(id, email);
+    if (ok) toast.success("Email verified");
+    else toast.error(hunterError || "Verification failed");
+    clearError();
+  };
+
+  const handleOpenOwnerEdit = () => {
+    setOwnerFirst(lead?.likelyOwner?.firstName ?? "");
+    setOwnerLast(lead?.likelyOwner?.lastName ?? "");
+    setOwnerPosition(lead?.likelyOwner?.position ?? "");
+    setOwnerEditing(true);
+  };
+
+  const handleCancelOwnerEdit = () => {
+    setOwnerEditing(false);
+  };
+
+  const handleSaveOwner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ownerFirst.trim() || !ownerLast.trim()) return;
+    setOwnerSaving(true);
+    try {
+      await updateLead(id, {
+        likelyOwner: {
+          firstName: ownerFirst.trim(),
+          lastName: ownerLast.trim(),
+          position: ownerPosition.trim() || undefined,
+          source: "manual",
+        },
+      });
+      toast.success("Owner saved");
+      setOwnerEditing(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save owner");
+    } finally {
+      setOwnerSaving(false);
+    }
   };
 
   const currentStepIndex = lead ? allStatuses.indexOf(lead.status) : 0;
@@ -164,7 +255,7 @@ export default function LeadDetailPage() {
                 <MessageSquare size={12} className="text-[#6B7570]" />
                 <span className="text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Reviews</span>
               </div>
-              <span className="text-xl font-bold text-[#1A2E22] tabular-nums">{lead.googleReviewCount.toLocaleString()}</span>
+              <span className="text-xl font-bold text-[#1A2E22] tabular-nums">{(lead.googleReviewCount ?? 0).toLocaleString()}</span>
             </div>
             <div className="bg-[#F5F1EB] rounded-xs px-4 py-3">
               <div className="flex items-center gap-1.5 mb-1">
@@ -205,6 +296,91 @@ export default function LeadDetailPage() {
                   <Copy size={10} className="opacity-0 group-hover:opacity-100 transition" />
                 </button>
               )}
+              {lead.allEmailsFound && lead.allEmailsFound.length > 1 && (
+                <div className="w-full mt-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[10px] font-medium text-[#8A9590] uppercase tracking-wide">All emails found ({lead.allEmailsFound.length})</p>
+                    <div className="flex items-center gap-2">
+                      {selectedEmails.size > 0 && (
+                        <span className="text-[10px] font-medium text-[#3D8B5E]">{selectedEmails.size} selected for outreach</span>
+                      )}
+                      <button
+                        onClick={() => {
+                          if (selectedEmails.size === lead.allEmailsFound!.length) {
+                            setSelectedEmails(new Set());
+                          } else {
+                            setSelectedEmails(new Set(lead.allEmailsFound!));
+                          }
+                        }}
+                        className="text-[10px] font-medium text-[#3D8B5E] hover:text-[#2D7A4E] transition"
+                      >
+                        {selectedEmails.size === lead.allEmailsFound.length ? "Deselect all" : "Select all"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {lead.allEmailsFound.map((e: string) => {
+                      const dm = (lead.decisionMakers ?? []).find((d) => d.email === e);
+                      const prefix = e.split("@")[0].toLowerCase();
+                      const isGeneric = ["info", "contact", "hello", "office", "admin", "support", "help", "reception", "appointments", "billing", "team", "sales", "marketing", "general", "mail", "noreply"].includes(prefix);
+                      const label = dm?.position || (dm && !dm.isGeneric ? `${dm.firstName} ${dm.lastName}`.trim() : null);
+                      const isSelected = selectedEmails.has(e);
+                      return (
+                        <button
+                          key={e}
+                          onClick={() => {
+                            setSelectedEmails((prev) => {
+                              const next = new Set(prev);
+                              next.has(e) ? next.delete(e) : next.add(e);
+                              return next;
+                            });
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-[11px] transition group ${
+                            isSelected
+                              ? "font-semibold text-[#1A2E22] bg-[#3D8B5E]/15 ring-1 ring-[#3D8B5E]/40"
+                              : e === lead.email
+                              ? "font-semibold text-[#1A2E22] bg-[#3D8B5E]/12 ring-1 ring-[#3D8B5E]/30"
+                              : "text-[#5A6B60] bg-[#F5F1EB] hover:bg-[#EDE8E0]"
+                          }`}
+                        >
+                          <span className={`w-3.5 h-3.5 rounded-xs border flex items-center justify-center shrink-0 transition ${
+                            isSelected ? "bg-[#3D8B5E] border-[#3D8B5E]" : "border-[#CCC7BE] bg-white"
+                          }`}>
+                            {isSelected && <Check size={10} className="text-white" strokeWidth={3} />}
+                          </span>
+                          <Mail size={10} className="shrink-0" />
+                          <span>{e}</span>
+                          {label && (
+                            <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#2A4A3A]/10 text-[#2A4A3A]">
+                              {label}
+                            </span>
+                          )}
+                          {!label && dm?.isGeneric && (
+                            <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#B89A4A]/10 text-[#B89A4A]">
+                              generic
+                            </span>
+                          )}
+                          {!label && !dm && isGeneric && (
+                            <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#8A9590]/10 text-[#8A9590]">
+                              generic
+                            </span>
+                          )}
+                          {!label && !dm && !isGeneric && (
+                            <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#3D8B5E]/10 text-[#3D8B5E]">
+                              personal
+                            </span>
+                          )}
+                          {e === lead.email && (
+                            <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#3D8B5E] text-white">
+                              primary
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {lead.website && (
                 <a
                   href={lead.website}
@@ -231,6 +407,84 @@ export default function LeadDetailPage() {
               )}
             </div>
           )}
+
+          {/* Owner row */}
+          <div className="mt-4 pt-4 border-t border-[#EDE8E0]">
+            {ownerEditing ? (
+              <form onSubmit={handleSaveOwner} className="flex flex-wrap items-end gap-2">
+                <div>
+                  <label className="block text-[10px] text-[#8A9590] mb-1">First Name</label>
+                  <input
+                    type="text"
+                    value={ownerFirst}
+                    onChange={(e) => setOwnerFirst(e.target.value)}
+                    placeholder="Jane"
+                    className="border border-[#CCC7BE] rounded-xs px-2.5 py-1.5 text-xs text-[#1A2E22] placeholder-[#8A9590] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 w-28 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#8A9590] mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    value={ownerLast}
+                    onChange={(e) => setOwnerLast(e.target.value)}
+                    placeholder="Smith"
+                    className="border border-[#CCC7BE] rounded-xs px-2.5 py-1.5 text-xs text-[#1A2E22] placeholder-[#8A9590] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 w-28 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-[#8A9590] mb-1">Position</label>
+                  <input
+                    type="text"
+                    value={ownerPosition}
+                    onChange={(e) => setOwnerPosition(e.target.value)}
+                    placeholder="DDS"
+                    className="border border-[#CCC7BE] rounded-xs px-2.5 py-1.5 text-xs text-[#1A2E22] placeholder-[#8A9590] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 w-20 transition-all"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={ownerSaving || !ownerFirst.trim() || !ownerLast.trim()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xs text-xs font-semibold text-white bg-[#3D8B5E] hover:bg-[#2D7A4E] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {ownerSaving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelOwnerEdit}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xs text-xs font-medium text-[#6B7570] bg-[#F5F1EB] hover:bg-[#EDE8E0] transition"
+                >
+                  <X size={11} />
+                  Cancel
+                </button>
+              </form>
+            ) : lead.likelyOwner ? (
+              <div className="flex items-center gap-2">
+                <User size={13} className="text-[#3D8B5E] shrink-0" />
+                <span className="text-xs text-[#3D5347]">
+                  Likely owner: Dr. {lead.likelyOwner.firstName} {lead.likelyOwner.lastName}
+                  {lead.likelyOwner.position ? `, ${lead.likelyOwner.position}` : ""}
+                </span>
+                <span className="text-[10px] text-[#8A9590] ml-1">({lead.likelyOwner.source})</span>
+                <button
+                  onClick={handleOpenOwnerEdit}
+                  className="ml-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-xs text-[10px] text-[#6B7570] hover:text-[#3D8B5E] hover:bg-[#F5F1EB] transition"
+                  title="Edit owner"
+                >
+                  <Pencil size={10} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleOpenOwnerEdit}
+                className="inline-flex items-center gap-1.5 text-xs text-[#8A9590] hover:text-[#3D8B5E] transition"
+              >
+                <User size={12} />
+                + Add owner
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -299,6 +553,7 @@ export default function LeadDetailPage() {
               })}
             </div>
           </div>
+
 
           {/* Reviews */}
           {lead.reviews && lead.reviews.length > 0 && (
@@ -504,21 +759,31 @@ export default function LeadDetailPage() {
               {/* Send Outreach button */}
               <div className="px-2 pt-2 pb-1">
                 <button
-                  onClick={() => openPreviewModal(lead._id)}
-                  disabled={!canSendOutreach}
+                  onClick={() => {
+                    openPreviewModal(lead._id).then(() => {
+                      if (selectedEmails.size > 0) {
+                        const emails = Array.from(selectedEmails);
+                        const { updatePreviewField } = useEmailOutreachStore.getState();
+                        updatePreviewField("to", emails.join(", "));
+                      }
+                    });
+                  }}
+                  disabled={!canSendOutreach && selectedEmails.size === 0}
                   title={
-                    !lead.email
+                    !lead.email && selectedEmails.size === 0
                       ? "No email address available"
                       : !lead.analyzed
                       ? "Lead must be analyzed first"
-                      : !canSendOutreach
+                      : !canSendOutreach && selectedEmails.size === 0
                       ? "Outreach already sent"
+                      : selectedEmails.size > 0
+                      ? `Send to ${selectedEmails.size} selected email${selectedEmails.size > 1 ? "s" : ""}`
                       : "Send email outreach"
                   }
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xs text-sm font-semibold text-white bg-[#2A4A3A] hover:bg-[#1E3A2E] transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Send size={14} />
-                  Send Outreach
+                  {selectedEmails.size > 1 ? `Send to ${selectedEmails.size} Emails` : "Send Outreach"}
                 </button>
                 {!lead.email && (
                   <p className="text-[10px] text-[#C75555] text-center mt-1.5">
@@ -547,7 +812,7 @@ export default function LeadDetailPage() {
                 { label: "Added", value: new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), icon: <Calendar size={13} /> },
                 { label: "Updated", value: new Date(lead.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), icon: <Calendar size={13} /> },
                 lead.leadScore !== undefined ? { label: "Lead Score", value: `${lead.leadScore} / 100`, icon: <TrendingUp size={13} /> } : null,
-                lead.emailSource ? { label: "Email Source", value: lead.emailSource === "domain-search" ? "Domain Search (SMTP)" : lead.emailSource === "scrape" ? "Website Scrape" : lead.emailSource.charAt(0).toUpperCase() + lead.emailSource.slice(1), icon: <Mail size={13} /> } : null,
+                lead.emailSource ? { label: "Email Source", value: lead.emailSource.charAt(0).toUpperCase() + lead.emailSource.slice(1), icon: <Mail size={13} /> } : null,
                 { label: "Place ID", value: lead.googlePlaceId, icon: <Hash size={13} />, mono: true },
               ]
                 .filter(Boolean)
