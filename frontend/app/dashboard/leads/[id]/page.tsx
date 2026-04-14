@@ -69,6 +69,7 @@ export default function LeadDetailPage() {
   const [ownerPosition, setOwnerPosition] = useState("");
   const [ownerSaving, setOwnerSaving] = useState(false);
   const [showGenerics, setShowGenerics] = useState(false);
+  const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
 
   const id = params.id as string;
   const searching = isSearching(id);
@@ -297,23 +298,56 @@ export default function LeadDetailPage() {
               )}
               {lead.allEmailsFound && lead.allEmailsFound.length > 1 && (
                 <div className="w-full mt-2">
-                  <p className="text-[10px] font-medium text-[#8A9590] uppercase tracking-wide mb-1">All emails found ({lead.allEmailsFound.length})</p>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[10px] font-medium text-[#8A9590] uppercase tracking-wide">All emails found ({lead.allEmailsFound.length})</p>
+                    <div className="flex items-center gap-2">
+                      {selectedEmails.size > 0 && (
+                        <span className="text-[10px] font-medium text-[#3D8B5E]">{selectedEmails.size} selected for outreach</span>
+                      )}
+                      <button
+                        onClick={() => {
+                          if (selectedEmails.size === lead.allEmailsFound!.length) {
+                            setSelectedEmails(new Set());
+                          } else {
+                            setSelectedEmails(new Set(lead.allEmailsFound!));
+                          }
+                        }}
+                        className="text-[10px] font-medium text-[#3D8B5E] hover:text-[#2D7A4E] transition"
+                      >
+                        {selectedEmails.size === lead.allEmailsFound.length ? "Deselect all" : "Select all"}
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
                     {lead.allEmailsFound.map((e: string) => {
                       const dm = (lead.decisionMakers ?? []).find((d) => d.email === e);
                       const prefix = e.split("@")[0].toLowerCase();
                       const isGeneric = ["info", "contact", "hello", "office", "admin", "support", "help", "reception", "appointments", "billing", "team", "sales", "marketing", "general", "mail", "noreply"].includes(prefix);
                       const label = dm?.position || (dm && !dm.isGeneric ? `${dm.firstName} ${dm.lastName}`.trim() : null);
+                      const isSelected = selectedEmails.has(e);
                       return (
                         <button
                           key={e}
-                          onClick={() => copyToClipboard(e, "Email")}
+                          onClick={() => {
+                            setSelectedEmails((prev) => {
+                              const next = new Set(prev);
+                              next.has(e) ? next.delete(e) : next.add(e);
+                              return next;
+                            });
+                          }}
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-[11px] transition group ${
-                            e === lead.email
+                            isSelected
+                              ? "font-semibold text-[#1A2E22] bg-[#3D8B5E]/15 ring-1 ring-[#3D8B5E]/40"
+                              : e === lead.email
                               ? "font-semibold text-[#1A2E22] bg-[#3D8B5E]/12 ring-1 ring-[#3D8B5E]/30"
                               : "text-[#5A6B60] bg-[#F5F1EB] hover:bg-[#EDE8E0]"
                           }`}
                         >
+                          <span className={`w-3.5 h-3.5 rounded-xs border flex items-center justify-center shrink-0 transition ${
+                            isSelected ? "bg-[#3D8B5E] border-[#3D8B5E]" : "border-[#CCC7BE] bg-white"
+                          }`}>
+                            {isSelected && <Check size={10} className="text-white" strokeWidth={3} />}
+                          </span>
                           <Mail size={10} className="shrink-0" />
                           <span>{e}</span>
                           {label && (
@@ -341,7 +375,6 @@ export default function LeadDetailPage() {
                               primary
                             </span>
                           )}
-                          <Copy size={8} className="opacity-0 group-hover:opacity-100 transition shrink-0" />
                         </button>
                       );
                     })}
@@ -726,21 +759,31 @@ export default function LeadDetailPage() {
               {/* Send Outreach button */}
               <div className="px-2 pt-2 pb-1">
                 <button
-                  onClick={() => openPreviewModal(lead._id)}
-                  disabled={!canSendOutreach}
+                  onClick={() => {
+                    openPreviewModal(lead._id).then(() => {
+                      if (selectedEmails.size > 0) {
+                        const emails = Array.from(selectedEmails);
+                        const { updatePreviewField } = useEmailOutreachStore.getState();
+                        updatePreviewField("to", emails.join(", "));
+                      }
+                    });
+                  }}
+                  disabled={!canSendOutreach && selectedEmails.size === 0}
                   title={
-                    !lead.email
+                    !lead.email && selectedEmails.size === 0
                       ? "No email address available"
                       : !lead.analyzed
                       ? "Lead must be analyzed first"
-                      : !canSendOutreach
+                      : !canSendOutreach && selectedEmails.size === 0
                       ? "Outreach already sent"
+                      : selectedEmails.size > 0
+                      ? `Send to ${selectedEmails.size} selected email${selectedEmails.size > 1 ? "s" : ""}`
                       : "Send email outreach"
                   }
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xs text-sm font-semibold text-white bg-[#2A4A3A] hover:bg-[#1E3A2E] transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Send size={14} />
-                  Send Outreach
+                  {selectedEmails.size > 1 ? `Send to ${selectedEmails.size} Emails` : "Send Outreach"}
                 </button>
                 {!lead.email && (
                   <p className="text-[10px] text-[#C75555] text-center mt-1.5">

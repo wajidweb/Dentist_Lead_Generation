@@ -328,6 +328,10 @@ export async function analyzePage(url: string): Promise<PuppeteerResult> {
       // Scroll failure is non-critical
     }
 
+    // Scroll back to top and wait for lazy content to finish rendering
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await delay(5000);
+
     console.log(`[Puppeteer] Taking full-page desktop screenshot...`);
     const pageHeight = await page.evaluate(() => document.body.scrollHeight);
     const desktopCaptureHeight = Math.min(pageHeight, 7800); // Stay under Claude's 8000px limit
