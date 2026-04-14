@@ -8,13 +8,14 @@ import {
   determineLeadCategory,
 } from "../services/scoreService";
 import { uploadScreenshots } from "../services/cloudinaryService";
+import { findEmail } from "../services/emailFinderService";
 import Lead from "../models/Lead";
 import AnalysisGroup from "../models/AnalysisGroup";
 
 let worker: Worker | null = null;
 
 async function processJob(job: Job<AnalysisJobData>) {
-  const { leadId, websiteUrl, groupId } = job.data;
+  const { leadId, websiteUrl, groupId, emailProvider = "harvester" } = job.data;
   const tag = `[Lead ${leadId}]`;
 
   console.log(`${tag} Starting analysis for ${websiteUrl}`);
@@ -114,6 +115,30 @@ async function processJob(job: Job<AnalysisJobData>) {
     analyzedAt: new Date(),
     status: "analyzed",
   };
+
+  // Save email — orchestrated priority chain: provider → scrape → domain-search
+  if (!lead.email) {
+    console.log(`${tag} Finding email via priority chain (${emailProvider} → scrape → domain-search)...`);
+    const emailResult = await findEmail(websiteUrl, puppeteerResult.emails, emailProvider);
+    if (emailResult.email) {
+      updateData.email = emailResult.email;
+      updateData.allEmailsFound = emailResult.allEmailsFound;
+      updateData.emailSource = emailResult.source;
+      if (emailResult.verified) {
+        updateData.emailVerified = true;
+        updateData.emailVerificationStatus = "deliverable";
+      }
+      console.log(
+        `${tag} Email found via ${emailResult.source}: ${emailResult.email}` +
+          (emailResult.allEmailsFound.length > 1
+            ? ` (${emailResult.allEmailsFound.length} total found)`
+            : "")
+      );
+    } else {
+      console.log(`${tag} No email found via any method`);
+    }
+  }
+
 
   await Lead.findByIdAndUpdate(leadId, updateData);
 

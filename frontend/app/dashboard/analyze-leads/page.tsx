@@ -77,6 +77,7 @@ export default function AnalyzeLeadsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"pending" | "all">("pending");
+  const [emailProvider, setEmailProvider] = useState<"harvester" | "hunter">("harvester");
 
   const analyzing = !!activeGroupId;
 
@@ -168,9 +169,9 @@ export default function AnalyzeLeadsPage() {
 
   const handleAnalyze = async () => {
     if (selected.size === 0) return;
-    const result = await startAnalysis(Array.from(selected));
+    const result = await startAnalysis(Array.from(selected), emailProvider);
     if (result) {
-      toast.success(`Analyzing ${result.totalJobs} website${result.totalJobs > 1 ? "s" : ""}...`);
+      toast.success(`Analyzing ${result.totalJobs} website${result.totalJobs > 1 ? "s" : ""} with ${emailProvider === "harvester" ? "theHarvester" : "Hunter.io"}...`);
       setSelected(new Set());
     } else {
       toast.error("Failed to start analysis");
@@ -179,9 +180,9 @@ export default function AnalyzeLeadsPage() {
 
   const handleAnalyzeAll = async () => {
     if (leads.length === 0) return;
-    const result = await startAnalysis(leads.map((l) => l._id));
+    const result = await startAnalysis(leads.map((l) => l._id), emailProvider);
     if (result) {
-      toast.success(`Analyzing ${result.totalJobs} website${result.totalJobs > 1 ? "s" : ""}...`);
+      toast.success(`Analyzing ${result.totalJobs} website${result.totalJobs > 1 ? "s" : ""} with ${emailProvider === "harvester" ? "theHarvester" : "Hunter.io"}...`);
       setSelected(new Set());
     } else {
       toast.error("Failed to start analysis");
@@ -226,6 +227,29 @@ export default function AnalyzeLeadsPage() {
             <p className="text-sm text-[#6B7570] mt-1">Review and mark leads as analyzed to move them through the pipeline</p>
           </div>
           <div className="grid grid-cols-2 sm:flex sm:items-center gap-2.5">
+            {/* Email Provider Toggle */}
+            <div className="flex items-center bg-white border border-[#CCC7BE] rounded-xs overflow-hidden col-span-2 sm:col-span-1">
+              <button
+                onClick={() => setEmailProvider("harvester")}
+                className={`px-3 py-2.5 text-xs font-semibold transition-all duration-200 ${
+                  emailProvider === "harvester"
+                    ? "bg-[#2A4A3A] text-white"
+                    : "text-[#5A6B60] hover:bg-[#F5F1EB]"
+                }`}
+              >
+                theHarvester
+              </button>
+              <button
+                onClick={() => setEmailProvider("hunter")}
+                className={`px-3 py-2.5 text-xs font-semibold transition-all duration-200 ${
+                  emailProvider === "hunter"
+                    ? "bg-[#2A4A3A] text-white"
+                    : "text-[#5A6B60] hover:bg-[#F5F1EB]"
+                }`}
+              >
+                Hunter.io
+              </button>
+            </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-4 py-2.5 rounded-xs font-medium text-sm border transition-all duration-200 flex items-center justify-center gap-2 ${

@@ -63,6 +63,7 @@ export interface Lead {
   googleReviewCount: number;
   reviews: Review[];
   email?: string;
+  allEmailsFound?: string[];
   emailSource?: string;
   websiteAnalysis?: WebsiteAnalysis;
   websiteQualityScore?: number;
@@ -152,7 +153,7 @@ interface LeadsStore {
   clearCurrentLead: () => void;
   bulkDeleteLeads: (ids: string[]) => Promise<number>;
   bulkUpdateStatus: (ids: string[], status: string) => Promise<number>;
-  startAnalysis: (ids: string[]) => Promise<{ groupId: string; totalJobs: number } | null>;
+  startAnalysis: (ids: string[], emailProvider?: "harvester" | "hunter") => Promise<{ groupId: string; totalJobs: number } | null>;
   getAnalysisStatus: (groupId: string) => Promise<AnalysisStatus | null>;
   retryFailedAnalysis: (groupId: string) => Promise<number>;
   cancelAnalysis: (groupId: string) => Promise<number>;
@@ -332,11 +333,11 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
     }
   },
 
-  startAnalysis: async (ids) => {
+  startAnalysis: async (ids, emailProvider = "harvester") => {
     try {
       const res = await apiFetch("/analysis/start", {
         method: "POST",
-        body: JSON.stringify({ leadIds: ids }),
+        body: JSON.stringify({ leadIds: ids, emailProvider }),
       });
       const data = await res.json();
       if (!res.ok) return null;

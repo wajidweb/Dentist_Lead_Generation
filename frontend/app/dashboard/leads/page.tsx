@@ -364,16 +364,6 @@ export default function LeadsPage() {
               </button>
             )}
             <button
-              onClick={handleBulkFindContacts}
-              disabled={hunterSearching || selected.size > 10}
-              title={selected.size > 10 ? "Maximum 10 leads for bulk search" : "Find decision makers via Hunter.io"}
-              className="px-3 py-1.5 rounded-xs text-xs font-medium text-white bg-[#3D8B5E] hover:bg-[#2D7A4E] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-            >
-              {hunterSearching ? <Loader2 size={12} className="animate-spin" /> : <Users size={12} />}
-              Find Contacts{selected.size > 10 ? " (max 10)" : ""}
-            </button>
-            <div className="w-px h-5 bg-white/20 mx-1 hidden sm:block" />
-            <button
               onClick={handleBulkDelete}
               className="px-3 py-1.5 rounded-xs text-xs font-medium text-[#C75555] bg-[#C75555]/10 hover:bg-[#C75555]/20 border border-[#C75555]/20 transition flex items-center gap-1.5"
             >
@@ -620,36 +610,6 @@ export default function LeadsPage() {
                               Website
                             </button>
                           )}
-                          {(() => {
-                            const isLeadSearching = isSearching(lead._id);
-                            const personalDMs = (lead.decisionMakers ?? []).filter((d) => !d.isGeneric);
-                            const genericDMs = (lead.decisionMakers ?? []).filter((d) => d.isGeneric);
-                            const hasPersonal = personalDMs.length > 0;
-                            const titleText = hasPersonal
-                              ? `${personalDMs.length} contact${personalDMs.length !== 1 ? "s" : ""}${genericDMs.length > 0 ? ` (+${genericDMs.length} generic)` : ""} found — click to re-search`
-                              : "Find decision-makers via Hunter.io";
-                            return (
-                              <button
-                                onClick={(e) => handleFindContact(e, lead._id)}
-                                disabled={isLeadSearching}
-                                title={titleText}
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-xs text-[11px] font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
-                                  hasPersonal
-                                    ? "text-[#3D8B5E] hover:bg-[#3D8B5E]/8"
-                                    : "text-[#6B7570] hover:text-[#2D7A4E] hover:bg-[#3D8B5E]/8"
-                                }`}
-                              >
-                                {isLeadSearching ? (
-                                  <Loader2 size={12} className="animate-spin" />
-                                ) : hasPersonal ? (
-                                  <Users size={12} />
-                                ) : (
-                                  <UserPlus size={12} />
-                                )}
-                                {isLeadSearching ? "Searching..." : hasPersonal ? `${personalDMs.length} contact${personalDMs.length !== 1 ? "s" : ""}${genericDMs.length > 0 ? ` (+${genericDMs.length})` : ""}` : "Find Contact"}
-                              </button>
-                            );
-                          })()}
                           <button
                             onClick={(e) => handleSingleDelete(e, lead._id, lead.businessName)}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-xs text-[11px] font-medium text-[#8A9590] hover:text-[#C75555] hover:bg-[#C75555]/5 transition"
@@ -695,33 +655,6 @@ export default function LeadsPage() {
                             Website
                           </button>
                         )}
-                        {(() => {
-                          const isLeadSearching = isSearching(lead._id);
-                          const personalDMs = (lead.decisionMakers ?? []).filter((d) => !d.isGeneric);
-                          const genericDMs = (lead.decisionMakers ?? []).filter((d) => d.isGeneric);
-                          const hasPersonal = personalDMs.length > 0;
-                          return (
-                            <button
-                              onClick={(e) => handleFindContact(e, lead._id)}
-                              disabled={isLeadSearching}
-                              title={hasPersonal ? `${personalDMs.length} contact${personalDMs.length !== 1 ? "s" : ""}${genericDMs.length > 0 ? ` (+${genericDMs.length} generic)` : ""} — re-search` : "Find decision-makers"}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-xs text-[11px] font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
-                                hasPersonal
-                                  ? "text-[#3D8B5E] bg-[#3D8B5E]/10 active:bg-[#3D8B5E]/20"
-                                  : "text-[#3D5347] bg-[#F5F1EB] active:bg-[#EDE8E0]"
-                              }`}
-                            >
-                              {isLeadSearching ? (
-                                <Loader2 size={11} className="animate-spin shrink-0" />
-                              ) : hasPersonal ? (
-                                <Users size={11} className="shrink-0" />
-                              ) : (
-                                <UserPlus size={11} className="shrink-0" />
-                              )}
-                              {isLeadSearching ? "Searching..." : hasPersonal ? `${personalDMs.length}${genericDMs.length > 0 ? `+${genericDMs.length}` : ""}` : "Find Contact"}
-                            </button>
-                          );
-                        })()}
                         <button
                           onClick={(e) => handleSingleDelete(e, lead._id, lead.businessName)}
                           className="inline-flex items-center gap-1 px-2 py-1 rounded-xs text-[11px] font-medium text-[#C75555] bg-[#C75555]/5 active:bg-[#C75555]/10 transition"

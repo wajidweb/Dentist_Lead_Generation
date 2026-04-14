@@ -295,6 +295,59 @@ export default function LeadDetailPage() {
                   <Copy size={10} className="opacity-0 group-hover:opacity-100 transition" />
                 </button>
               )}
+              {lead.allEmailsFound && lead.allEmailsFound.length > 1 && (
+                <div className="w-full mt-2">
+                  <p className="text-[10px] font-medium text-[#8A9590] uppercase tracking-wide mb-1">All emails found ({lead.allEmailsFound.length})</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {lead.allEmailsFound.map((e: string) => {
+                      const dm = (lead.decisionMakers ?? []).find((d) => d.email === e);
+                      const prefix = e.split("@")[0].toLowerCase();
+                      const isGeneric = ["info", "contact", "hello", "office", "admin", "support", "help", "reception", "appointments", "billing", "team", "sales", "marketing", "general", "mail", "noreply"].includes(prefix);
+                      const label = dm?.position || (dm && !dm.isGeneric ? `${dm.firstName} ${dm.lastName}`.trim() : null);
+                      return (
+                        <button
+                          key={e}
+                          onClick={() => copyToClipboard(e, "Email")}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xs text-[11px] transition group ${
+                            e === lead.email
+                              ? "font-semibold text-[#1A2E22] bg-[#3D8B5E]/12 ring-1 ring-[#3D8B5E]/30"
+                              : "text-[#5A6B60] bg-[#F5F1EB] hover:bg-[#EDE8E0]"
+                          }`}
+                        >
+                          <Mail size={10} className="shrink-0" />
+                          <span>{e}</span>
+                          {label && (
+                            <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#2A4A3A]/10 text-[#2A4A3A]">
+                              {label}
+                            </span>
+                          )}
+                          {!label && dm?.isGeneric && (
+                            <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#B89A4A]/10 text-[#B89A4A]">
+                              generic
+                            </span>
+                          )}
+                          {!label && !dm && isGeneric && (
+                            <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#8A9590]/10 text-[#8A9590]">
+                              generic
+                            </span>
+                          )}
+                          {!label && !dm && !isGeneric && (
+                            <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#3D8B5E]/10 text-[#3D8B5E]">
+                              personal
+                            </span>
+                          )}
+                          {e === lead.email && (
+                            <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#3D8B5E] text-white">
+                              primary
+                            </span>
+                          )}
+                          <Copy size={8} className="opacity-0 group-hover:opacity-100 transition shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {lead.website && (
                 <a
                   href={lead.website}
@@ -468,206 +521,6 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Decision Makers */}
-          {(() => {
-            const allDMs = lead.decisionMakers ?? [];
-            const personalDMs = allDMs.filter((dm) => !dm.isGeneric);
-            const genericDMs = allDMs.filter((dm) => dm.isGeneric);
-            const autoExpand = personalDMs.length === 0 && genericDMs.length > 0;
-            const showRows = [...personalDMs, ...(showGenerics || autoExpand ? genericDMs : [])];
-            return (
-          <div className="bg-white rounded-xs border border-[#D8D2C8] shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#EDE8E0] flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Users size={15} className="text-[#3D8B5E]" />
-                <h2 className="text-sm font-bold text-[#1A2E22]">Decision Makers</h2>
-                {personalDMs.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-xs text-[10px] font-bold bg-[#3D8B5E]/10 text-[#3D8B5E]">
-                    {personalDMs.length}
-                  </span>
-                )}
-                {genericDMs.length > 0 && (
-                  <span className="text-[10px] text-[#8A9590]">(+{genericDMs.length} generic)</span>
-                )}
-              </div>
-              <button
-                onClick={handleSearchDecisionMakers}
-                disabled={searching}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xs text-xs font-semibold text-white bg-[#2A4A3A] hover:bg-[#1E3A2E] transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {searching ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Search size={12} />
-                )}
-                {lead.likelyOwner?.firstName && lead.likelyOwner?.lastName
-                  ? (() => {
-                      const fullName = `${lead.likelyOwner.firstName} ${lead.likelyOwner.lastName}`;
-                      const label = `Find ${fullName}'s Email`;
-                      return label.length > 30 ? `Find ${fullName.substring(0, 25).trim()}...'s Email` : label;
-                    })()
-                  : "Find Decision Makers"}
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {/* State B banner — only generics available */}
-              {autoExpand && (
-                <div className="flex items-start gap-2.5 p-3 rounded-xs bg-[#B89A4A]/8 border border-[#B89A4A]/20">
-                  <AlertCircle size={14} className="text-[#B89A4A] shrink-0 mt-0.5" />
-                  <p className="text-[12px] text-[#B89A4A]">
-                    No personal emails found — only generic inboxes are available for this practice.
-                  </p>
-                </div>
-              )}
-
-              {/* Results table */}
-              {showRows.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[#EDE8E0]">
-                        <th className="pb-2.5 text-left text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Name</th>
-                        <th className="pb-2.5 text-left text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Email</th>
-                        <th className="pb-2.5 text-left text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Position</th>
-                        <th className="pb-2.5 text-left text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Confidence</th>
-                        <th className="pb-2.5 text-left text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Status</th>
-                        <th className="pb-2.5 text-right text-[10px] font-semibold text-[#6B7570] uppercase tracking-wider">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#F5F1EB]">
-                      {showRows.map((dm, idx) => {
-                        const confidenceColor =
-                          dm.confidence >= 80 ? "bg-[#3D8B5E]/10 text-[#3D8B5E]" :
-                          dm.confidence >= 50 ? "bg-[#B89A4A]/10 text-[#B89A4A]" :
-                          "bg-[#C75555]/10 text-[#C75555]";
-
-                        const verBadge =
-                          dm.verificationStatus === "deliverable" ? { bg: "bg-[#3D8B5E]/10", text: "text-[#3D8B5E]", label: "Deliverable" } :
-                          dm.verificationStatus === "risky" ? { bg: "bg-[#B89A4A]/10", text: "text-[#B89A4A]", label: "Risky" } :
-                          dm.verificationStatus === "undeliverable" ? { bg: "bg-[#C75555]/10", text: "text-[#C75555]", label: "Undeliverable" } :
-                          { bg: "bg-[#F5F1EB]", text: "text-[#6B7570]", label: "Unknown" };
-
-                        return (
-                          <tr key={idx} className={`group ${dm.isGeneric ? "opacity-80" : ""}`}>
-                            <td className="py-3 pr-3">
-                              <div className="flex items-center gap-1.5">
-                                <span className={`text-[13px] font-medium ${dm.isGeneric ? "text-[#5A6B60]" : "text-[#1A2E22]"}`}>
-                                  {dm.firstName} {dm.lastName}
-                                </span>
-                                {dm.isGeneric && (
-                                  <span className="px-1.5 py-0.5 rounded-xs text-[9px] font-bold bg-[#B89A4A]/10 text-[#B89A4A]">
-                                    generic
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-3 pr-3">
-                              <button
-                                onClick={() => copyToClipboard(dm.email, "Email")}
-                                className={`inline-flex items-center gap-1 text-[13px] hover:text-[#3D8B5E] transition group/email ${dm.isGeneric ? "text-[#5A6B60]" : "text-[#3D5347]"}`}
-                              >
-                                {dm.email}
-                                <Copy size={10} className="opacity-0 group-hover/email:opacity-100 transition" />
-                              </button>
-                            </td>
-                            <td className="py-3 pr-3">
-                              <span className={`text-[12px] ${dm.isGeneric ? "text-[#8A9590]" : "text-[#6B7570]"}`}>{dm.position || "—"}</span>
-                            </td>
-                            <td className="py-3 pr-3">
-                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-xs text-[10px] font-bold tabular-nums ${confidenceColor}`}>
-                                {dm.confidence}%
-                              </span>
-                            </td>
-                            <td className="py-3 pr-3">
-                              <div className="flex items-center gap-1.5">
-                                {dm.verified && (
-                                  <ShieldCheck size={12} className="text-[#3D8B5E] shrink-0" />
-                                )}
-                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-xs text-[10px] font-medium ${verBadge.bg} ${verBadge.text}`}>
-                                  {verBadge.label}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="py-3 text-right">
-                              {dm.verificationStatus === "unknown" && (
-                                <button
-                                  onClick={() => handleVerifyEmail(dm.email)}
-                                  disabled={verifying}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-xs text-[10px] font-medium border border-[#CCC7BE] text-[#5A6B60] hover:bg-[#F5F1EB] transition disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                  {verifying ? <Loader2 size={9} className="animate-spin" /> : <ShieldCheck size={9} />}
-                                  Verify
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {/* State A footer — toggle generics */}
-                  {personalDMs.length > 0 && genericDMs.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-[#EDE8E0]">
-                      <button
-                        onClick={() => setShowGenerics((v) => !v)}
-                        className="text-[11px] text-[#B89A4A] hover:text-[#9A7A3A] font-medium transition"
-                      >
-                        {showGenerics ? `Hide generic inboxes` : `Show ${genericDMs.length} generic inbox${genericDMs.length !== 1 ? "es" : ""}`}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-6 gap-2 text-center">
-                  <div className="w-10 h-10 rounded-full bg-[#F5F1EB] flex items-center justify-center">
-                    <Users size={18} className="text-[#8A9590]" />
-                  </div>
-                  <p className="text-sm text-[#6B7570]">No decision makers found yet</p>
-                  <p className="text-[11px] text-[#8A9590]">Click "Find Decision Makers" to search Hunter.io</p>
-                </div>
-              )}
-
-              {/* Name lookup form */}
-              <div className="border-t border-[#EDE8E0] pt-4">
-                <p className="text-[11px] font-semibold text-[#6B7570] uppercase tracking-wider mb-3">
-                  Find Specific Person
-                </p>
-                <form onSubmit={handleFindEmail} className="flex items-end gap-2 flex-wrap">
-                  <div>
-                    <label className="block text-[10px] text-[#8A9590] mb-1">First Name</label>
-                    <input
-                      type="text"
-                      value={finderFirstName}
-                      onChange={(e) => setFinderFirstName(e.target.value)}
-                      placeholder="Jane"
-                      className="border border-[#CCC7BE] rounded-xs px-2.5 py-1.5 text-xs text-[#1A2E22] placeholder-[#8A9590] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 w-32 transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-[#8A9590] mb-1">Last Name</label>
-                    <input
-                      type="text"
-                      value={finderLastName}
-                      onChange={(e) => setFinderLastName(e.target.value)}
-                      placeholder="Smith"
-                      className="border border-[#CCC7BE] rounded-xs px-2.5 py-1.5 text-xs text-[#1A2E22] placeholder-[#8A9590] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 w-32 transition-all"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={searching || !finderFirstName.trim() || !finderLastName.trim()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xs text-xs font-semibold text-white bg-[#3D8B5E] hover:bg-[#2D7A4E] transition disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {searching ? <Loader2 size={11} className="animate-spin" /> : <Mail size={11} />}
-                    Find Email
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-            );
-          })()}
 
           {/* Reviews */}
           {lead.reviews && lead.reviews.length > 0 && (
