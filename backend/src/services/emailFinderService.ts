@@ -53,11 +53,14 @@ function pickBestEmail(emails: string[]): string {
 // ---------------------------------------------------------------------------
 
 async function findViaHunter(domain: string): Promise<string[]> {
+  console.log(`[EmailFinder] Querying Hunter.io for ${domain}...`);
   try {
     const result = await domainSearch(domain);
-    if (result.emails && result.emails.length > 0) {
+    const count = result.emails?.length ?? 0;
+    if (count > 0) {
       return result.emails.map((e) => e.value);
     }
+    console.log(`[EmailFinder] Hunter.io returned 0 emails for ${domain} (domain has no indexed emails)`);
     return [];
   } catch (err) {
     console.warn(
@@ -93,13 +96,14 @@ export async function findEmail(
   // Step 1: Primary provider (harvester or hunter)
   if (domain) {
     if (provider === "harvester") {
+      console.log(`[EmailFinder] Querying theHarvester for ${domain}...`);
       try {
         const harvesterEmails = await findEmailsByDomain(domain);
         const validHarvester = filterValidEmails(harvesterEmails);
         if (validHarvester.length > 0) {
           const best = pickBestEmail(validHarvester);
           console.log(
-            `[EmailFinder] Harvester found ${validHarvester.length} emails for ${domain}, picked: ${best}`
+            `[EmailFinder] theHarvester found ${validHarvester.length} emails for ${domain}, picked: ${best}`
           );
           return {
             email: best,
@@ -108,9 +112,10 @@ export async function findEmail(
             allEmailsFound: validHarvester,
           };
         }
+        console.log(`[EmailFinder] theHarvester returned 0 emails for ${domain} — falling through to scrape/domain-search`);
       } catch (err) {
         console.warn(
-          `[EmailFinder] Harvester lookup failed for ${domain}:`,
+          `[EmailFinder] theHarvester lookup failed for ${domain}:`,
           err instanceof Error ? err.message : err
         );
       }

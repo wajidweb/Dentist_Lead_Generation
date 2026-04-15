@@ -14,9 +14,36 @@ import AnalysisGroup from "../models/AnalysisGroup";
 
 let worker: Worker | null = null;
 
+/**
+ * Thrown when a checkpoint detects that the batch was cancelled.
+ * Bubbles up to the worker's error handler which treats it as a clean abort
+ * (no retry, no "failed" status — just stops).
+ */
+class BatchCancelledError extends Error {
+  constructor(groupId: string) {
+    super(`Batch ${groupId} was cancelled`);
+    this.name = "BatchCancelledError";
+  }
+}
+
+/**
+ * Cancellation checkpoint — call between expensive stages. If the group has
+ * been cancelled in the DB, throws BatchCancelledError to unwind the worker.
+ */
+async function assertNotCancelled(groupId: string): Promise<void> {
+  const group = await AnalysisGroup.findById(groupId).select("status").lean();
+  if (group?.status === "cancelled") {
+    throw new BatchCancelledError(groupId);
+  }
+}
+
 async function processJob(job: Job<AnalysisJobData>) {
   const { leadId, websiteUrl, groupId, emailProvider = "harvester" } = job.data;
   const tag = `[Lead ${leadId}]`;
+
+  // Pre-flight check: if the batch was cancelled while this job was waiting
+  // in the queue, bail out before we even mark the lead as processing.
+  await assertNotCancelled(groupId);
 
   console.log(`${tag} Starting analysis for ${websiteUrl}`);
 
@@ -30,6 +57,62 @@ async function processJob(job: Job<AnalysisJobData>) {
   console.log(
     `${tag} Step 1/4: Puppeteer done — loadTime=${puppeteerResult.loadTimeMs}ms, https=${puppeteerResult.isHttps}, text=${puppeteerResult.pageText.length} chars, screenshot=${puppeteerResult.desktopScreenshot.length} bytes`
   );
+
+  // Cloudflare-blocked short-circuit:
+  // The site is behind a Cloudflare challenge/block page, so any downstream
+  // analysis (Claude visual/content, scoring, screenshots) would be garbage.
+  // We still run the email-discovery chain because harvester/domain-search
+  // operate on the domain via third-party APIs, not on the rendered page.
+  if (puppeteerResult.cloudflareBlocked) {
+    // Checkpoint before we start the (potentially slow) email flow.
+    await assertNotCancelled(groupId);
+
+    console.warn(`${tag} Cloudflare blocked — skipping analysis, continuing with email flow`);
+    await job.updateProgress(50);
+
+    const leadDoc = await Lead.findById(leadId);
+    if (!leadDoc) throw new Error(`Lead ${leadId} not found`);
+
+    const cfUpdate: Record<string, unknown> = {
+      cloudflareBlocked: true,
+      analyzed: true,
+      analysisStatus: "completed",
+      analyzedAt: new Date(),
+      status: "analyzed",
+    };
+
+    if (!leadDoc.email) {
+      console.log(`${tag} Finding email via priority chain (${emailProvider} → scrape → domain-search)...`);
+      const emailResult = await findEmail(websiteUrl, puppeteerResult.emails, emailProvider);
+      if (emailResult.email) {
+        cfUpdate.email = emailResult.email;
+        cfUpdate.allEmailsFound = emailResult.allEmailsFound;
+        cfUpdate.emailSource = emailResult.source;
+        if (emailResult.verified) {
+          cfUpdate.emailVerified = true;
+          cfUpdate.emailVerificationStatus = "deliverable";
+        }
+        console.log(
+          `${tag} Email found via ${emailResult.source}: ${emailResult.email}` +
+            (emailResult.allEmailsFound.length > 1
+              ? ` (${emailResult.allEmailsFound.length} total found)`
+              : "")
+        );
+      } else {
+        console.log(`${tag} No email found via any method`);
+      }
+    }
+
+    await Lead.findByIdAndUpdate(leadId, cfUpdate);
+    await AnalysisGroup.findByIdAndUpdate(groupId, { $inc: { completedCount: 1 } });
+    await checkGroupCompletion(groupId);
+
+    console.log(`${tag} COMPLETE (CF BLOCKED) — ${leadDoc.businessName}`);
+    return { leadId, cloudflareBlocked: true };
+  }
+
+  // Checkpoint: user may have cancelled during the slow Puppeteer step.
+  await assertNotCancelled(groupId);
 
   // Step 2: Claude — visual + content analysis
   console.log(`${tag} Step 2/4: Claude — analyzing website...`);
@@ -66,6 +149,9 @@ async function processJob(job: Job<AnalysisJobData>) {
   console.log(
     `${tag} Scores — websiteQuality=${websiteQualityScore}/100, leadScore=${leadScore}/100, category=${leadCategory.toUpperCase()}`
   );
+
+  // Checkpoint: user may have cancelled during the slow Claude step.
+  await assertNotCancelled(groupId);
 
   // Step 4: Upload screenshots to Cloudinary
   console.log(`${tag} Step 4/4: Uploading screenshots to Cloudinary...`);
@@ -187,6 +273,20 @@ export function startAnalysisWorker() {
 
   worker.on("failed", async (job, err) => {
     if (!job) return;
+
+    // Clean-abort path: user cancelled the batch mid-flight. Don't retry, don't
+    // mark the lead as failed — just reset it back to pending so it can be
+    // re-queued later if desired.
+    if (err.name === "BatchCancelledError") {
+      console.log(
+        `[Worker] Job aborted (batch cancelled): lead ${job.data.leadId}`
+      );
+      await Lead.findByIdAndUpdate(job.data.leadId, {
+        analysisStatus: "pending",
+        $unset: { analysisGroupId: "", analysisError: "" },
+      }).catch(() => {});
+      return;
+    }
 
     const maxAttempts = job.opts.attempts ?? 1;
     if (job.attemptsMade < maxAttempts) {
