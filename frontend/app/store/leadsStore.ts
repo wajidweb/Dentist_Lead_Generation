@@ -75,6 +75,7 @@ export interface Lead {
   analyzed: boolean;
   analysisStatus?: string;
   analysisError?: string;
+  cloudflareBlocked?: boolean;
   analysisGroupId?: string;
   analyzedAt?: string;
   notes?: string;

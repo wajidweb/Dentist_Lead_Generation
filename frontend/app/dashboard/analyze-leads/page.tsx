@@ -570,7 +570,13 @@ export default function AnalyzeLeadsPage() {
                                 {lead.leadCategory}
                               </span>
                             )}
-                            {lead.analyzed && (
+                            {lead.cloudflareBlocked && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#C75555]/10 text-[#C75555]" title="Site is protected by Cloudflare — website analysis was skipped">
+                                <AlertCircle size={10} />
+                                CF Blocked
+                              </span>
+                            )}
+                            {lead.analyzed && !lead.cloudflareBlocked && (
                               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#3D8B5E]">
                                 <CheckCircle2 size={10} />
                                 Analyzed
@@ -728,7 +734,13 @@ export default function AnalyzeLeadsPage() {
                                 {lead.leadCategory}
                               </span>
                             )}
-                            {lead.analyzed && (
+                            {lead.cloudflareBlocked && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#C75555]/10 text-[#C75555]" title="Site is protected by Cloudflare — website analysis was skipped">
+                                <AlertCircle size={10} />
+                                CF Blocked
+                              </span>
+                            )}
+                            {lead.analyzed && !lead.cloudflareBlocked && (
                               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#3D8B5E]">
                                 <CheckCircle2 size={10} />
                                 Analyzed

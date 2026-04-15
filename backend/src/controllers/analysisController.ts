@@ -204,33 +204,51 @@ export const cancelBatch = async (req: Request, res: Response) => {
       return;
     }
 
-    // Remove waiting jobs from queue
-    const waitingJobs = await analysisQueue.getJobs(["waiting", "delayed"]);
-    let cancelledCount = 0;
-    for (const job of waitingJobs) {
-      if (job.data.groupId === group._id.toString()) {
-        await job.remove();
-        cancelledCount++;
-      }
-    }
+    const groupIdStr = group._id.toString();
 
-    // Reset queued leads back to pending
-    await Lead.updateMany(
-      {
-        analysisGroupId: group._id.toString(),
-        analysisStatus: "queued",
-      },
-      { $set: { analysisStatus: "pending", analysisGroupId: undefined } }
-    );
-
+    // 1. Flip the group status FIRST so any in-flight worker that hits a
+    //    checkpoint sees the cancellation and aborts itself.
     await AnalysisGroup.findByIdAndUpdate(group._id, {
       status: "cancelled",
       completedAt: new Date(),
     });
 
+    // 2. Remove not-yet-started jobs from the BullMQ queue.
+    const waitingJobs = await analysisQueue.getJobs(["waiting", "delayed"]);
+    let removedFromQueue = 0;
+    for (const job of waitingJobs) {
+      if (job.data.groupId === groupIdStr) {
+        await job.remove();
+        removedFromQueue++;
+      }
+    }
+
+    // 3. Currently-processing jobs can't be killed mid-function, but their
+    //    next checkpoint call will throw BatchCancelledError and the worker's
+    //    failed-handler will reset the lead. Count them so we can report.
+    const activeJobs = await analysisQueue.getJobs(["active"]);
+    const activeCount = activeJobs.filter(
+      (j) => j.data.groupId === groupIdStr
+    ).length;
+
+    // 4. Reset any queued leads back to pending immediately.
+    await Lead.updateMany(
+      {
+        analysisGroupId: groupIdStr,
+        analysisStatus: "queued",
+      },
+      { $set: { analysisStatus: "pending" }, $unset: { analysisGroupId: "" } }
+    );
+
+    const total = removedFromQueue + activeCount;
     res.json({
-      cancelledCount,
-      message: `Cancelled ${cancelledCount} pending analyses`,
+      cancelledCount: total,
+      queuedRemoved: removedFromQueue,
+      activeAborting: activeCount,
+      message:
+        activeCount > 0
+          ? `Cancelled ${removedFromQueue} queued; ${activeCount} in-flight will abort at the next checkpoint`
+          : `Cancelled ${removedFromQueue} queued analyses`,
     });
   } catch (error) {
     console.error("Cancel batch error:", error);

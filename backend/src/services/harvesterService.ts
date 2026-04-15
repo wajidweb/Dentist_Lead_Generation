@@ -162,11 +162,35 @@ async function queryHarvester(
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       console.warn(`[Harvester] Request timed out for ${domain}`);
+    } else if (isConnectionRefused(err)) {
+      console.warn(
+        `[Harvester] Service unreachable at ${cfg.apiUrl} (ECONNREFUSED) — skipping ${domain}. ` +
+          `Start theHarvester REST API or set HARVESTER_ENABLED=false to suppress this warning.`
+      );
     } else {
-      console.warn(`[Harvester] Request failed for ${domain}:`, err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[Harvester] Request failed for ${domain}: ${msg}`);
     }
     return [];
   }
+}
+
+/** Walk Error.cause chain to detect the node:net ECONNREFUSED inside `fetch failed`. */
+function isConnectionRefused(err: unknown): boolean {
+  let cur: unknown = err;
+  for (let i = 0; i < 5 && cur; i++) {
+    if (cur && typeof cur === "object") {
+      const obj = cur as { code?: string; errors?: unknown[]; cause?: unknown };
+      if (obj.code === "ECONNREFUSED") return true;
+      if (Array.isArray(obj.errors) && obj.errors.some((e) => (e as { code?: string })?.code === "ECONNREFUSED")) {
+        return true;
+      }
+      cur = obj.cause;
+    } else {
+      break;
+    }
+  }
+  return false;
 }
 
 function parseEmails(body: Record<string, unknown>): string[] {

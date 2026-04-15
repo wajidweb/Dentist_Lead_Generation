@@ -534,6 +534,14 @@ export default function LeadsPage() {
                                 {lead.leadCategory}
                               </span>
                             )}
+                            {lead.cloudflareBlocked && (
+                              <span
+                                className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#C75555]/10 text-[#C75555]"
+                                title="Site is protected by Cloudflare — website analysis was skipped"
+                              >
+                                CF Blocked
+                              </span>
+                            )}
                             {(() => {
                               const personalDMs = (lead.decisionMakers ?? []).filter((d) => !d.isGeneric);
                               const genericDMs = (lead.decisionMakers ?? []).filter((d) => d.isGeneric);

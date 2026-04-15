@@ -12,6 +12,7 @@ export interface PuppeteerResult {
   loadTimeMs: number;
   isHttps: boolean;
   emails: string[];
+  cloudflareBlocked: boolean;
   domChecks: {
     hasContactForm: boolean;
     hasPhoneLink: boolean;
@@ -32,6 +33,11 @@ export interface PuppeteerResult {
 
 let browser: Browser | null = null;
 let fallbackBrowser: Browser | null = null;
+// In-flight launch promises — prevents concurrent workers from racing two
+// `puppeteer.launch()` calls, which causes "Timed out waiting for WS endpoint
+// URL" when two Chromium processes contend for the same pipe.
+let browserLaunch: Promise<Browser> | null = null;
+let fallbackLaunch: Promise<Browser> | null = null;
 let jobCount = 0;
 
 const BROWSER_LAUNCH_ARGS = [
@@ -52,26 +58,55 @@ const BROWSER_LAUNCH_ARGS = [
 
 const RESTART_EVERY_N_JOBS = 50;
 
+async function launchBrowser(): Promise<Browser> {
+  return puppeteer.launch({
+    headless: true,
+    args: BROWSER_LAUNCH_ARGS,
+    // Give Chromium more time to print its WS endpoint when the host is under
+    // load (default is 30s; we've seen timeouts there with concurrency > 1).
+    timeout: 60_000,
+  });
+}
+
 async function getBrowser(): Promise<Browser> {
-  if (!browser || !browser.connected) {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: BROWSER_LAUNCH_ARGS,
-    });
+  if (browser && browser.connected) return browser;
+  // Share the in-flight launch so concurrent callers don't double-launch.
+  if (!browserLaunch) {
+    browserLaunch = launchBrowser()
+      .then((b) => {
+        browser = b;
+        // Any disconnect (crash, oom-kill, manual close) — drop the reference
+        // so the next getBrowser() relaunches cleanly.
+        b.once("disconnected", () => {
+          if (browser === b) browser = null;
+        });
+        return b;
+      })
+      .finally(() => {
+        browserLaunch = null;
+      });
   }
-  return browser;
+  return browserLaunch;
 }
 
 /** Plain browser with NO adblocker plugin — used as fallback when the primary
  *  browser's adblocker blocks the target page itself. */
 async function getFallbackBrowser(): Promise<Browser> {
-  if (!fallbackBrowser || !fallbackBrowser.connected) {
-    fallbackBrowser = await puppeteer.launch({
-      headless: true,
-      args: BROWSER_LAUNCH_ARGS,
-    });
+  if (fallbackBrowser && fallbackBrowser.connected) return fallbackBrowser;
+  if (!fallbackLaunch) {
+    fallbackLaunch = launchBrowser()
+      .then((b) => {
+        fallbackBrowser = b;
+        b.once("disconnected", () => {
+          if (fallbackBrowser === b) fallbackBrowser = null;
+        });
+        return b;
+      })
+      .finally(() => {
+        fallbackLaunch = null;
+      });
   }
-  return fallbackBrowser;
+  return fallbackLaunch;
 }
 
 export async function closeBrowser(): Promise<void> {
@@ -95,10 +130,9 @@ export async function closeBrowser(): Promise<void> {
 
 async function restartBrowser(): Promise<void> {
   await closeBrowser();
-  browser = await puppeteer.launch({
-    headless: true,
-    args: BROWSER_LAUNCH_ARGS,
-  });
+  // Don't pre-launch — the next getBrowser() will memoize a single launch
+  // shared by whoever calls first. Pre-launching here would race with any
+  // in-flight getBrowser() that raced the close.
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +243,119 @@ async function extractPageText(page: Page): Promise<string> {
   return text.length > 5000 ? text.slice(0, 5000) : text;
 }
 
+/**
+ * Extract emails from the rendered page:
+ *   1. `mailto:` href attributes (highest signal — intentionally published)
+ *   2. Visible text + full HTML regex match (catches contact-page emails
+ *      that aren't wrapped in mailto: links)
+ *
+ * Filters out obvious junk (sentry, wixpress, example.com, noreply,
+ * image-embedded paths, etc.) that turn up in third-party scripts.
+ */
+async function extractEmails(page: Page): Promise<string[]> {
+  const raw = await page.evaluate(() => {
+    const out = new Set<string>();
+
+    // 1. mailto: links
+    document.querySelectorAll<HTMLAnchorElement>('a[href^="mailto:"]').forEach((a) => {
+      const href = a.getAttribute("href") || "";
+      const addr = href.replace(/^mailto:/i, "").split("?")[0].trim();
+      if (addr) out.add(addr);
+    });
+
+    // 2. Regex over visible body text + full outerHTML (covers data-attributes,
+    //    obfuscated "name at domain dot com" rarely, and contact-page copy).
+    const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+    const text = document.body?.innerText || "";
+    const html = document.documentElement?.outerHTML || "";
+    for (const match of text.match(EMAIL_RE) ?? []) out.add(match);
+    for (const match of html.match(EMAIL_RE) ?? []) out.add(match);
+
+    return Array.from(out);
+  });
+
+  // Junk filter — domains/prefixes that appear in third-party scripts, CDNs,
+  // trackers, or obvious placeholders. Also drop image-path matches.
+  const JUNK_DOMAINS = [
+    "sentry.io", "wixpress.com", "example.com", "domain.com", "email.com",
+    "localhost", "sentry-cdn.com", "googletagmanager.com", "google-analytics.com",
+    "doubleclick.net", "facebook.com", "fb.com", "instagram.com",
+    "cloudflare.com", "jsdelivr.net", "unpkg.com", "gstatic.com",
+  ];
+  const JUNK_PREFIXES = ["noreply", "no-reply", "donotreply", "do-not-reply"];
+
+  return raw
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => {
+      // Drop image-path matches like "you@2x.png"
+      if (/\.(png|jpg|jpeg|gif|svg|webp|ico|pdf|css|js)$/i.test(e)) return false;
+      const [prefix, domain = ""] = e.split("@");
+      if (!prefix || !domain) return false;
+      if (JUNK_PREFIXES.includes(prefix)) return false;
+      if (JUNK_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))) return false;
+      return true;
+    })
+    .filter((e, i, arr) => arr.indexOf(e) === i); // dedupe
+}
+
+/**
+ * Detect whether the current page is a Cloudflare challenge / block page
+ * (e.g. "Just a moment...", "Attention Required!", access denied, Ray ID
+ * error pages). These pages don't reflect the real website and should not
+ * be fed into downstream analysis.
+ */
+async function detectCloudflareBlock(page: Page): Promise<boolean> {
+  try {
+    return await page.evaluate(() => {
+      const title = (document.title || "").toLowerCase();
+      const bodyText = (document.body?.innerText || "").toLowerCase();
+      const html = document.documentElement?.outerHTML?.toLowerCase() || "";
+
+      const titleSignals = [
+        "just a moment",
+        "attention required",
+        "access denied",
+        "please wait",
+      ];
+      if (titleSignals.some((s) => title.includes(s))) {
+        // Confirm it's Cloudflare specifically, not a generic "access denied"
+        if (
+          html.includes("cloudflare") ||
+          html.includes("cf-ray") ||
+          html.includes("__cf_chl") ||
+          html.includes("cf-browser-verification") ||
+          html.includes("cf-challenge")
+        ) {
+          return true;
+        }
+      }
+
+      const bodySignals = [
+        "checking your browser before accessing",
+        "enable javascript and cookies to continue",
+        "cloudflare ray id",
+        "performance & security by cloudflare",
+        "sorry, you have been blocked",
+      ];
+      if (bodySignals.some((s) => bodyText.includes(s))) return true;
+
+      const htmlSignals = [
+        "cf-browser-verification",
+        "cf-challenge-running",
+        "__cf_chl_opt",
+        "cf_chl_",
+        'id="challenge-form"',
+        'id="cf-error-details"',
+      ];
+      if (htmlSignals.some((s) => html.includes(s))) return true;
+
+      return false;
+    });
+  } catch {
+    return false;
+  }
+}
+
 /** Run DOM checks to evaluate the dental website's features. */
 async function runDomChecks(page: Page): Promise<PuppeteerResult["domChecks"]> {
   return page.evaluate(() => ({
@@ -311,6 +458,37 @@ export async function analyzePage(url: string): Promise<PuppeteerResult> {
     const finalUrl = page.url();
     const isHttps = finalUrl.startsWith("https://");
 
+    // Cloudflare challenge / block detection — short-circuit before we spend
+    // time on screenshots, Claude analysis, etc. Email-discovery (which runs
+    // from the domain in the worker) is unaffected.
+    const cloudflareBlocked = await detectCloudflareBlock(page);
+    if (cloudflareBlocked) {
+      console.warn(`[Puppeteer] Cloudflare block detected for ${url} — skipping analysis`);
+      await page.close();
+      page = null;
+      jobCount++;
+      return {
+        desktopScreenshot: Buffer.alloc(0),
+        pageText: "",
+        loadTimeMs,
+        isHttps,
+        emails: [],
+        cloudflareBlocked: true,
+        domChecks: {
+          hasContactForm: false,
+          hasPhoneLink: false,
+          hasEmailLink: false,
+          hasBookingWidget: false,
+          hasGoogleMap: false,
+          hasSocialLinks: false,
+          hasSchemaMarkup: false,
+          hasVideo: false,
+          imageCount: 0,
+          navigationItemCount: 0,
+        },
+      };
+    }
+
     // Layer 2: hide cookie banners via CSS
     try {
       await page.addStyleTag({ content: COOKIE_BANNER_CSS });
@@ -333,10 +511,26 @@ export async function analyzePage(url: string): Promise<PuppeteerResult> {
     await delay(5000);
 
     console.log(`[Puppeteer] Taking full-page desktop screenshot...`);
-    const pageHeight = await page.evaluate(() => document.body.scrollHeight);
-    const desktopCaptureHeight = Math.min(pageHeight, 7800); // Stay under Claude's 8000px limit
-    if (pageHeight > 7800) {
-      console.log(`[Puppeteer] Desktop height ${pageHeight}px capped to 7800px`);
+    // Read height from both body and documentElement — some error pages (403,
+    // redirect shells, about:blank fallbacks) have body.scrollHeight === 0
+    // which crashes page.screenshot with "'height' in 'clip' must be positive."
+    const pageHeight = await page.evaluate(() =>
+      Math.max(
+        document.body?.scrollHeight ?? 0,
+        document.documentElement?.scrollHeight ?? 0,
+        window.innerHeight ?? 0
+      )
+    );
+    const MIN_CAPTURE_HEIGHT = 800; // Never go below the viewport
+    const MAX_CAPTURE_HEIGHT = 7800; // Claude's 8000px limit
+    const desktopCaptureHeight = Math.max(
+      MIN_CAPTURE_HEIGHT,
+      Math.min(pageHeight || MIN_CAPTURE_HEIGHT, MAX_CAPTURE_HEIGHT)
+    );
+    if (pageHeight > MAX_CAPTURE_HEIGHT) {
+      console.log(`[Puppeteer] Desktop height ${pageHeight}px capped to ${MAX_CAPTURE_HEIGHT}px`);
+    } else if (pageHeight <= 0) {
+      console.warn(`[Puppeteer] Page reported 0 height — falling back to ${MIN_CAPTURE_HEIGHT}px viewport capture`);
     }
 
     const desktopScreenshot = (await page.screenshot({
@@ -353,10 +547,13 @@ export async function analyzePage(url: string): Promise<PuppeteerResult> {
     // -----------------------------------------------------------------------
     // Text extraction & DOM checks
     // -----------------------------------------------------------------------
-    console.log(`[Puppeteer] Extracting text and running DOM checks...`);
+    console.log(`[Puppeteer] Extracting text, emails, and running DOM checks...`);
     const pageText = await extractPageText(page);
+    const emails = await extractEmails(page).catch(() => [] as string[]);
     const domChecks = await runDomChecks(page);
-    console.log(`[Puppeteer] Done — text=${pageText.length} chars, images=${domChecks.imageCount}, form=${domChecks.hasContactForm}, booking=${domChecks.hasBookingWidget}`);
+    console.log(
+      `[Puppeteer] Done — text=${pageText.length} chars, emails=${emails.length}, images=${domChecks.imageCount}, form=${domChecks.hasContactForm}, booking=${domChecks.hasBookingWidget}`
+    );
 
     // -----------------------------------------------------------------------
     // Cleanup
@@ -379,7 +576,8 @@ export async function analyzePage(url: string): Promise<PuppeteerResult> {
       pageText,
       loadTimeMs,
       isHttps,
-      emails: [],
+      emails,
+      cloudflareBlocked: false,
       domChecks,
     };
   } catch (error) {
@@ -393,15 +591,23 @@ export async function analyzePage(url: string): Promise<PuppeteerResult> {
       page = null;
     }
 
-    // If the browser itself crashed, restart it for subsequent calls
+    // If the browser itself crashed OR ended up in a bad per-session state
+    // (detached frames usually mean the page navigated during our setup and
+    // left stale CDP handles that poison the rest of the browser for other
+    // tabs), restart it for subsequent calls.
     if (
       error instanceof Error &&
       (error.message.includes("Target closed") ||
         error.message.includes("Session closed") ||
         error.message.includes("Protocol error") ||
-        error.message.includes("browser has disconnected"))
+        error.message.includes("browser has disconnected") ||
+        error.message.includes("detached Frame") ||
+        error.message.includes("frame was detached") ||
+        error.message.includes("WS endpoint URL"))
     ) {
-      console.error(`Browser crash detected for ${url}, restarting browser`);
+      console.error(
+        `[Puppeteer] Browser in bad state for ${url} (${error.message.split("\n")[0]}) — restarting`
+      );
       await restartBrowser().catch(() => {});
     }
 

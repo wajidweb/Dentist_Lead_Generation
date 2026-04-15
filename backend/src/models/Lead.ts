@@ -151,6 +151,7 @@ export interface ILead extends Document {
   analyzed: boolean;
   analysisStatus: 'pending' | 'queued' | 'processing' | 'completed' | 'failed';
   analysisError?: string;
+  cloudflareBlocked?: boolean;
   analysisGroupId?: string;
   analyzedAt?: Date;
   websiteQualityScore?: number;
@@ -342,6 +343,7 @@ const leadSchema = new Schema<ILead>(
       default: 'pending',
     },
     analysisError: { type: String },
+    cloudflareBlocked: { type: Boolean, default: false },
     analysisGroupId: { type: String },
     analyzedAt: { type: Date },
     websiteQualityScore: { type: Number },

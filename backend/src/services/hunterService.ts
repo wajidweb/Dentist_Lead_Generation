@@ -97,7 +97,19 @@ function httpsGet(path: string): Promise<unknown> {
       path,
       method: "GET",
       headers: {
-        Accept: "application/json",
+        // Browser-realistic headers. Without these, Cloudflare's bot protection
+        // on api.hunter.io flags requests from datacenter IPs (DO/AWS/Hetzner)
+        // and returns a 403 "Just a moment..." managed challenge page instead
+        // of the JSON API response. Locally this works because your laptop IP
+        // isn't in the datacenter reputation buckets.
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+          "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        // Deliberately NOT requesting gzip/deflate — httpsGet doesn't decode
+        // compressed bodies, so identity responses are required for JSON.parse.
+        "Accept-Encoding": "identity",
       },
       timeout: REQUEST_TIMEOUT_MS,
     };
@@ -149,13 +161,35 @@ function httpsGet(path: string): Promise<unknown> {
         }
 
         if (status >= 400) {
+          // Detect Cloudflare-edge block (api.hunter.io is behind CF). The
+          // edge returns an HTML challenge page instead of Hunter's JSON
+          // error envelope — log a short diagnostic instead of dumping 3KB
+          // of HTML into the logs.
+          const looksLikeCfChallenge =
+            /Just a moment|cf-chl|_cf_chl_opt|Enable JavaScript and cookies/i.test(data);
+          if (looksLikeCfChallenge) {
+            const ray = /cRay:\s*'([^']+)'/i.exec(data)?.[1];
+            console.error(
+              `[Hunter] GET ${path.split("?")[0]} → ${status} — Cloudflare edge challenge` +
+                (ray ? ` (Ray ID: ${ray})` : "") +
+                `. Your server IP is being flagged by CF's bot protection. ` +
+                `Contact Hunter.io support (support@hunter.io) with the Ray ID to allowlist the IP.`
+            );
+            reject(
+              new Error(
+                `Hunter API blocked by Cloudflare (${status}${ray ? `, Ray ${ray}` : ""})`
+              )
+            );
+            return;
+          }
+
           let parsed: HunterErrorBody = {};
           try {
             parsed = JSON.parse(data) as HunterErrorBody;
           } catch {
             // ignore
           }
-          const detail = parsed.errors?.[0]?.details ?? data;
+          const detail = parsed.errors?.[0]?.details ?? data.slice(0, 300);
           console.error(`[Hunter] GET ${path.split("?")[0]} → ${status}`, detail);
           reject(new Error(`Hunter API error ${status}: ${detail}`));
           return;
