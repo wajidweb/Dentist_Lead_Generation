@@ -82,7 +82,7 @@ export default function LeadsPage() {
     category: "",
     city: "",
     search: "",
-    sortBy: "leadScore",
+    sortBy: "analyzedAt",
     sortOrder: "desc" as "asc" | "desc",
   });
 
@@ -423,9 +423,9 @@ export default function LeadsPage() {
                 }}
                 className="col-span-2 sm:col-span-1 border border-[#CCC7BE] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/20 focus:bg-white transition-all sm:w-48"
               >
+                <option value="analyzedAt:desc">Recently Analyzed</option>
                 <option value="leadScore:desc">Highest Lead Score</option>
                 <option value="websiteQualityScore:asc">Worst Website First</option>
-                <option value="analyzedAt:desc">Recently Analyzed</option>
                 <option value="googleRating:desc">Highest Rating</option>
                 <option value="googleReviewCount:desc">Most Reviews</option>
               </select>
