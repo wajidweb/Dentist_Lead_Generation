@@ -70,6 +70,8 @@ export default function LeadsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const exportBtnRef = useRef<HTMLButtonElement>(null);
@@ -120,10 +122,17 @@ export default function LeadsPage() {
     }
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selected.size === 0) return;
-    if (!confirm(`Delete ${selected.size} lead${selected.size > 1 ? "s" : ""}? This cannot be undone.`)) return;
+    setBulkDeleteOpen(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selected.size === 0) return;
+    setBulkDeleting(true);
     const count = await bulkDeleteLeads(Array.from(selected));
+    setBulkDeleting(false);
+    setBulkDeleteOpen(false);
     if (count > 0) toast.success(`${count} lead${count > 1 ? "s" : ""} deleted`);
     else toast.error("Failed to delete leads");
     setSelected(new Set());
@@ -204,6 +213,50 @@ export default function LeadsPage() {
 
   return (
     <div className="max-w-[1400px] mx-auto">
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={() => !bulkDeleting && setBulkDeleteOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xs shadow-xl border border-[#D8D2C8] p-6 max-w-sm mx-4 animate-[fadeIn_0.15s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-10 rounded-xs bg-[#C75555]/10 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={18} className="text-[#C75555]" />
+            </div>
+            <h3 className="text-sm font-semibold text-[#1A2E22] text-center mb-1">
+              Delete {selected.size === 1 ? "Lead" : `${selected.size} Leads`}
+            </h3>
+            <p className="text-xs text-[#6B7570] text-center mb-5">
+              Are you sure you want to delete{" "}
+              <span className="font-medium text-[#1A2E22]">
+                {selected.size === 1 ? "this lead" : `these ${selected.size} leads`}
+              </span>
+              ? This action cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBulkDeleteOpen(false)}
+                disabled={bulkDeleting}
+                className="flex-1 px-4 py-2.5 rounded-xs text-sm font-medium border border-[#CCC7BE] text-[#3D5347] hover:bg-[#FAF8F5] transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmBulkDelete}
+                disabled={bulkDeleting}
+                className="flex-1 px-4 py-2.5 rounded-xs text-sm font-medium bg-[#C75555] text-white hover:bg-[#B04545] transition disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {bulkDeleting && <Loader2 size={14} className="animate-spin" />}
+                {bulkDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setDeleteConfirm(null)}>

@@ -1,7 +1,10 @@
 import https from "https";
 
 const INSTANTLY_BASE_URL = "https://api.instantly.ai/api/v2";
-const REQUEST_TIMEOUT_MS = 15_000;
+// 15s was too aggressive — the /leads endpoint can take 20-30s when the
+// campaign has many existing leads and the payload includes a long
+// `personalization` string. Bumped to 60s with retries on timeout.
+const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 3;
 
 // Lazy getter — ensures .env is loaded before reading the key
@@ -108,7 +111,7 @@ function httpsRequest(
 
     req.on("timeout", () => {
       req.destroy();
-      reject(new Error(`Instantly API request timed out after ${REQUEST_TIMEOUT_MS}ms`));
+      reject(new TimeoutError(REQUEST_TIMEOUT_MS));
     });
 
     req.on("error", (err) => reject(err));
@@ -127,6 +130,13 @@ class RateLimitError extends Error {
   }
 }
 
+class TimeoutError extends Error {
+  constructor(public readonly timeoutMs: number) {
+    super(`Instantly API request timed out after ${timeoutMs}ms`);
+    this.name = "TimeoutError";
+  }
+}
+
 async function requestWithRetry(
   method: string,
   path: string,
@@ -138,9 +148,15 @@ async function requestWithRetry(
     try {
       return await httpsRequest(method, path, body);
     } catch (err) {
-      if (err instanceof RateLimitError) {
+      // Retry rate limits (429) and timeouts (server is just slow). Other
+      // errors (4xx, network) bubble up immediately — retrying them would
+      // just waste time.
+      if (err instanceof RateLimitError || err instanceof TimeoutError) {
         lastError = err;
         const delayMs = Math.pow(2, attempt) * 1000;
+        console.warn(
+          `[Instantly] ${method} ${path} ${err.name === "TimeoutError" ? "timed out" : "rate-limited"} — retry ${attempt + 1}/${MAX_RETRIES} in ${delayMs}ms`
+        );
         await new Promise((resolve) => setTimeout(resolve, delayMs));
         continue;
       }
@@ -163,6 +179,11 @@ export async function createCampaign(
   const result = await requestWithRetry("POST", "/campaigns", {
     name,
     email_list: [sendingEmail],
+    // Tracking is mandatory for this product — analytics depend on it. Keep
+    // both on at creation; the campaign-options UI also auto-heals if they
+    // ever end up off (e.g. edited in Instantly's dashboard directly).
+    open_tracking: true,
+    link_tracking: true,
     campaign_schedule: {
       schedules: [
         {

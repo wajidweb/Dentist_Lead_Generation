@@ -139,9 +139,16 @@ export const useEmailOutreachStore = create<EmailOutreachStore>((set, get) => ({
 
   sendBulkOutreach: async (leadIds, subject, body, previewLink) => {
     try {
+      // Respect the user's Settings selection for the sending mailbox so bulk
+      // send uses the same "from" as single send. Falls back to the server
+      // default (INSTANTLY_EMAIL env) when nothing is selected.
+      const from =
+        typeof window !== "undefined"
+          ? localStorage.getItem("selectedSendingEmail") ?? undefined
+          : undefined;
       const res = await apiFetch("/email-outreach/send-bulk", {
         method: "POST",
-        body: JSON.stringify({ leadIds, subject, body, previewLink }),
+        body: JSON.stringify({ leadIds, subject, body, previewLink, from }),
       });
       const data = await res.json();
       if (!res.ok) return { sent: 0, failed: leadIds.length };

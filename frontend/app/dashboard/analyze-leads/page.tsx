@@ -23,6 +23,7 @@ import {
   TrendingUp,
   CheckCircle2,
   Clock,
+  Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useLeadsStore, AnalysisStatus } from "../../store/leadsStore";
@@ -71,13 +72,15 @@ export default function AnalyzeLeadsPage() {
     leads, total, page, totalPages, loading, fetchLeads, refreshLeads,
     startAnalysis, getAnalysisStatus, retryFailedAnalysis, cancelAnalysis,
     activeGroupId, analysisProgress: progress, setActiveGroup, restoreActiveGroup,
-    stats, fetchDashboardStats,
+    stats, fetchDashboardStats, bulkDeleteLeads,
   } = useLeadsStore();
   const [mounted, setMounted] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"pending" | "all">("pending");
   const [emailProvider, setEmailProvider] = useState<"harvester" | "hunter">("harvester");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const analyzing = !!activeGroupId;
 
@@ -207,6 +210,28 @@ export default function AnalyzeLeadsPage() {
     fetchDashboardStats();
   };
 
+  const handleBulkDelete = () => {
+    if (selected.size === 0) return;
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selected.size === 0) return;
+    setDeleting(true);
+    const label = selected.size === 1 ? "lead" : "leads";
+    const count = await bulkDeleteLeads(Array.from(selected));
+    setDeleting(false);
+    setDeleteConfirmOpen(false);
+    if (count > 0) {
+      toast.success(`Deleted ${count} ${label}`);
+      setSelected(new Set());
+      fetchLeads(filters);
+      fetchDashboardStats();
+    } else {
+      toast.error("Failed to delete leads");
+    }
+  };
+
   const totalLeadsCount = stats?.totalLeads ?? 0;
   const analyzedCount   = stats?.analyzed ?? 0;
   const pendingCount    = totalLeadsCount - analyzedCount;
@@ -218,6 +243,49 @@ export default function AnalyzeLeadsPage() {
 
   return (
     <div className="max-w-[1400px] mx-auto">
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={() => !deleting && setDeleteConfirmOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xs shadow-xl border border-[#D8D2C8] p-6 max-w-sm mx-4 animate-[fadeIn_0.15s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-10 rounded-xs bg-[#C75555]/10 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={18} className="text-[#C75555]" />
+            </div>
+            <h3 className="text-sm font-semibold text-[#1A2E22] text-center mb-1">
+              Delete {selected.size === 1 ? "Lead" : `${selected.size} Leads`}
+            </h3>
+            <p className="text-xs text-[#6B7570] text-center mb-5">
+              Are you sure you want to delete{" "}
+              <span className="font-medium text-[#1A2E22]">
+                {selected.size === 1 ? "this lead" : `these ${selected.size} leads`}
+              </span>
+              ? This action cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 rounded-xs text-sm font-medium border border-[#CCC7BE] text-[#3D5347] hover:bg-[#FAF8F5] transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmBulkDelete}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 rounded-xs text-sm font-medium bg-[#C75555] text-white hover:bg-[#B04545] transition disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {deleting && <Loader2 size={14} className="animate-spin" />}
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className={`mb-6 transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}>
@@ -412,6 +480,15 @@ export default function AnalyzeLeadsPage() {
             >
               {analyzing ? <Loader2 size={11} className="animate-spin" /> : <ClipboardCheck size={11} />}
               Analyze
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={analyzing}
+              title="Delete selected leads"
+              className="px-3 py-1 rounded-xs text-[11px] font-semibold bg-[#C75555] text-white hover:bg-[#B84444] transition flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap"
+            >
+              <Trash2 size={11} />
+              Delete
             </button>
           </div>
         )}

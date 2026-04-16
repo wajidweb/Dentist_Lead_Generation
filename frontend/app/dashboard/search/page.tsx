@@ -27,11 +27,14 @@ export default function SearchPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!location.trim()) return;
+    // Clamp targetLeads to [1, 100] to prevent runaway Google Places /
+    // downstream-analysis costs even if the input was bypassed (DOM, etc.).
+    const clampedTarget = Math.max(1, Math.min(100, Number(targetLeads) || 20));
     searchDentists({
       location: location.trim(),
       minRating: Number(minRating),
       minReviews: Number(minReviews),
-      targetLeads: Number(targetLeads),
+      targetLeads: clampedTarget,
     }).then(() => {
       const { results, error } = useSearchStore.getState();
       if (results) toast.success(`Found ${results.leadsCreated} leads in ${results.location}`);
@@ -49,11 +52,12 @@ export default function SearchPage() {
       return;
     }
     toast.success(`Search progress reset for ${results.location}`);
+    const clampedTarget = Math.max(1, Math.min(100, Number(targetLeads) || 20));
     searchDentists({
       location: results.location,
       minRating: Number(minRating),
       minReviews: Number(minReviews),
-      targetLeads: Number(targetLeads),
+      targetLeads: clampedTarget,
     }).then(() => {
       const { results: newResults, error } = useSearchStore.getState();
       if (newResults) toast.success(`Found ${newResults.leadsCreated} leads in ${newResults.location}`);
@@ -123,14 +127,24 @@ export default function SearchPage() {
                 <input
                   type="number"
                   value={targetLeads}
-                  onChange={(e) => setTargetLeads(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") return setTargetLeads(v);
+                    const n = Number(v);
+                    if (Number.isFinite(n)) {
+                      setTargetLeads(String(Math.max(1, Math.min(100, n))));
+                    }
+                  }}
                   min="1"
+                  max="100"
                   placeholder="20"
                   className="w-full border border-[#DDD8D0] rounded-xs px-3 py-2.5 text-sm text-[#1A2E22] bg-[#FAF8F5] focus:outline-none focus:border-[#3D8B5E] focus:ring-2 focus:ring-[#3D8B5E]/30 focus:bg-white transition-all tabular-nums"
                 />
+                <p className="text-[10px] text-[#8A9590] mt-1">Max 100 per search</p>
               </div>
 
-              <div className="flex flex-col justify-end">
+              <div>
+                <label className="block text-[11px] font-medium text-transparent uppercase tracking-wider mb-1.5">&nbsp;</label>
                 <button
                   type="submit"
                   disabled={loading}

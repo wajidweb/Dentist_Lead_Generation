@@ -46,20 +46,31 @@ export const preview = async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({ message: "Lead does not have an email address" });
       return;
     }
-    if (!lead.analyzed || !lead.websiteAnalysis) {
-      res
-        .status(400)
-        .json({ message: "Lead has not been analyzed yet" });
+    // CF-blocked leads have `analyzed: true` but no `websiteAnalysis` because
+    // we deliberately skipped Claude analysis when the site was behind a
+    // Cloudflare challenge. Accept them here and fall back to a generic
+    // template — we still want to be able to email these leads.
+    if (!lead.analyzed) {
+      res.status(400).json({ message: "Lead has not been analyzed yet" });
+      return;
+    }
+    if (!lead.websiteAnalysis && !lead.cloudflareBlocked) {
+      res.status(400).json({ message: "Lead has not been analyzed yet" });
       return;
     }
 
     const senderName = req.userEmail ?? "Your Name";
+    const analysis = lead.websiteAnalysis;
     const vars: EmailTemplateVariables = {
       businessName: lead.businessName,
-      visualIssues: lead.websiteAnalysis.visualIssues ?? [],
-      criticalMissing: lead.websiteAnalysis.criticalMissing ?? [],
-      issuesList: lead.websiteAnalysis.issuesList ?? [],
-      oneLineSummary: lead.websiteAnalysis.oneLineSummary ?? "",
+      visualIssues: analysis?.visualIssues ?? [],
+      criticalMissing: analysis?.criticalMissing ?? [],
+      issuesList: analysis?.issuesList ?? [],
+      oneLineSummary:
+        analysis?.oneLineSummary ??
+        (lead.cloudflareBlocked
+          ? `Your website was protected by security tooling that kept us from reviewing it automatically, so I took a quick manual look at the public pages.`
+          : ""),
       websiteUrl: lead.website ?? "",
       previewLink: previewLink,
       senderName,
@@ -144,11 +155,13 @@ export const sendBulk = async (req: Request, res: Response): Promise<void> => {
       subject,
       body,
       previewLink,
+      from,
     } = req.body as {
       leadIds?: string[];
       subject?: string;
       body?: string;
       previewLink?: string;
+      from?: string;
     };
 
     if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
@@ -180,7 +193,7 @@ export const sendBulk = async (req: Request, res: Response): Promise<void> => {
 
     const results = await Promise.allSettled(
       leadIds.map((leadId) =>
-        sendOutreach(leadId, userEmail, subject, body, previewLink)
+        sendOutreach(leadId, userEmail, subject, body, previewLink, undefined, from)
       )
     );
 
