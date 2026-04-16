@@ -143,7 +143,8 @@ export default function SearchPage() {
                 <p className="text-[10px] text-[#8A9590] mt-1">Max 100 per search</p>
               </div>
 
-              <div className="flex flex-col justify-end">
+              <div>
+                <label className="block text-[11px] font-medium text-transparent uppercase tracking-wider mb-1.5">&nbsp;</label>
                 <button
                   type="submit"
                   disabled={loading}
