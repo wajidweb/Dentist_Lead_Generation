@@ -51,7 +51,6 @@ I noticed a few things that could be costing you new patients:
 {{preview_block}}
 I work with dental practices to fix exactly these kinds of issues. Would you be open to a quick 10-minute call to explore how we could help ${vars.businessName} get more patients through your website?
 
-Best,
 ${vars.senderName}`;
 
   return { subject, body };
@@ -75,7 +74,6 @@ Practices that address these gaps typically see a measurable increase in new pat
 
 Would it make sense to jump on a quick call this week? I'd love to show you exactly what we'd do for ${vars.businessName}.
 
-Best,
 ${vars.senderName}`;
 
   return { subject, body };
@@ -95,7 +93,6 @@ I'd still love to help ${vars.businessName} get more patients from your website.
 
 Otherwise, a quick reply is all it takes to get started.
 
-Best,
 ${vars.senderName}`;
 
   return { subject, body };
