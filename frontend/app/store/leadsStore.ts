@@ -398,7 +398,24 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
       });
       const data = await res.json();
       if (!res.ok) return 0;
-      set({ activeGroupId: null, analysisProgress: null });
+      // Optimistically clear in-flight lead statuses for this group. Without
+      // this, the UI keeps showing "Analyzing..." badges on queued/processing
+      // leads for 30-60s while the backend workers wind down at their next
+      // cancellation checkpoint — looks stuck to the user.
+      set((state) => ({
+        activeGroupId: null,
+        analysisProgress: null,
+        leads: state.leads.map((l) => {
+          const inFlight =
+            l.analysisStatus === "queued" || l.analysisStatus === "processing";
+          const belongsToGroup =
+            !l.analysisGroupId || l.analysisGroupId === groupId;
+          if (inFlight && belongsToGroup) {
+            return { ...l, analysisStatus: "pending", analysisGroupId: undefined };
+          }
+          return l;
+        }),
+      }));
       localStorage.removeItem("analysisGroupId");
       return data.cancelledCount || 0;
     } catch {
@@ -424,12 +441,34 @@ export const useLeadsStore = create<LeadsStore>((set, get) => ({
       const data = await res.json();
       if (!res.ok) {
         localStorage.removeItem("analysisGroupId");
+        // Scrub any in-memory leads still stuck in queued/processing with an
+        // unreachable group — otherwise the UI shows "Analyzing..." forever.
+        set((state) => ({
+          leads: state.leads.map((l) =>
+            (l.analysisStatus === "queued" || l.analysisStatus === "processing") &&
+            l.analysisGroupId === savedGroupId
+              ? { ...l, analysisStatus: "pending", analysisGroupId: undefined }
+              : l
+          ),
+        }));
         return;
       }
       const status = data as AnalysisStatus;
       if (status.status === "completed" || status.status === "cancelled") {
         localStorage.removeItem("analysisGroupId");
-        set({ activeGroupId: null, analysisProgress: null });
+        // The group is no longer active. Any lead whose local status is still
+        // "queued" or "processing" is an orphan left over from the session —
+        // clear it so the UI doesn't keep flashing "Analyzing...".
+        set((state) => ({
+          activeGroupId: null,
+          analysisProgress: null,
+          leads: state.leads.map((l) =>
+            (l.analysisStatus === "queued" || l.analysisStatus === "processing") &&
+            (!l.analysisGroupId || l.analysisGroupId === savedGroupId)
+              ? { ...l, analysisStatus: "pending", analysisGroupId: undefined }
+              : l
+          ),
+        }));
       } else {
         set({ activeGroupId: savedGroupId, analysisProgress: status });
       }

@@ -86,12 +86,19 @@ export async function findEmailsByDomain(domain: string): Promise<string[]> {
     return [];
   }
 
-  // 1. Cache hit
+  // 1. Cache hit — also verify app-side that the record hasn't expired.
+  // MongoDB's TTL worker only runs every ~60s, so a record can linger past
+  // its expiresAt for up to a minute. Checking here avoids serving stale data.
   try {
     const cached = await HarvesterCache.findOne({ domain });
     if (cached) {
-      console.log(`[Harvester] Cache hit for ${domain} — ${cached.emails.length} emails`);
-      return cached.emails;
+      if (cached.expiresAt && cached.expiresAt.getTime() < Date.now()) {
+        console.log(`[Harvester] Cache expired for ${domain} — re-querying`);
+        await HarvesterCache.deleteOne({ domain }).catch(() => {});
+      } else {
+        console.log(`[Harvester] Cache hit for ${domain} — ${cached.emails.length} emails`);
+        return cached.emails;
+      }
     }
   } catch (err) {
     console.warn(`[Harvester] Cache read error for ${domain}:`, err);
@@ -195,7 +202,10 @@ function isConnectionRefused(err: unknown): boolean {
 
 function parseEmails(body: Record<string, unknown>): string[] {
   const raw = body.emails ?? body.email_addresses ?? [];
-  return parseStringArray(raw).filter((e) => e.includes("@"));
+  // Stricter than `.includes("@")` — rejects malformed entries like
+  // "@domain.com", "user@@domain.com", or bare words that slipped in.
+  const EMAIL_RE = /^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return parseStringArray(raw).filter((e) => EMAIL_RE.test(e.trim()));
 }
 
 function parseStringArray(value: unknown): string[] {

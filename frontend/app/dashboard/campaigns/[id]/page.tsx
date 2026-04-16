@@ -25,6 +25,7 @@ import {
   Settings2,
   Eye,
   Link2,
+  CheckCircle2,
 } from "lucide-react";
 import {
   useCampaignStore,
@@ -519,35 +520,27 @@ function OptionsTab({
   campaignId: string;
 }) {
   const { updateOptions } = useCampaignStore();
-  const [openTracking, setOpenTracking] = useState(details.openTracking ?? false);
-  const [linkTracking, setLinkTracking] = useState(details.linkTracking ?? false);
-  const [saving, setSaving] = useState(false);
 
+  // Tracking is enforced — both flags are always shown as enabled. If either
+  // one comes back from the API as off (older campaign or one edited directly
+  // in Instantly's dashboard), auto-heal by flipping it back on so every
+  // campaign in this product has consistent analytics.
   useEffect(() => {
-    setOpenTracking(details.openTracking ?? false);
-    setLinkTracking(details.linkTracking ?? false);
-  }, [details.openTracking, details.linkTracking]);
-
-  const handleToggle = async (
-    option: "openTracking" | "linkTracking",
-    value: boolean
-  ) => {
-    if (option === "openTracking") setOpenTracking(value);
-    else setLinkTracking(value);
-
-    setSaving(true);
-    const success = await updateOptions(campaignId, { [option]: value });
-    setSaving(false);
-
-    if (success) {
-      toast.success(`${option === "openTracking" ? "Open tracking" : "Link tracking"} ${value ? "enabled" : "disabled"}`);
-    } else {
-      // Revert on failure
-      if (option === "openTracking") setOpenTracking(!value);
-      else setLinkTracking(!value);
-      toast.error("Failed to update option");
+    const patch: { openTracking?: boolean; linkTracking?: boolean } = {};
+    if (details.openTracking !== true) patch.openTracking = true;
+    if (details.linkTracking !== true) patch.linkTracking = true;
+    if (Object.keys(patch).length > 0) {
+      updateOptions(campaignId, patch);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaignId, details.openTracking, details.linkTracking]);
+
+  const EnabledBadge = () => (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xs text-[11px] font-semibold bg-[#3D8B5E] text-white">
+      <CheckCircle2 size={12} />
+      Always Enabled
+    </span>
+  );
 
   return (
     <div className="space-y-4">
@@ -565,30 +558,7 @@ function OptionsTab({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1 rounded-xs border border-[#E8E2D8] overflow-hidden">
-            <button
-              onClick={() => handleToggle("openTracking", false)}
-              disabled={saving}
-              className={`px-4 py-2 text-xs font-semibold transition-all ${
-                !openTracking
-                  ? "bg-[#2A4A3A] text-white"
-                  : "bg-white text-[#6B7570] hover:bg-[#F5F1EB]"
-              }`}
-            >
-              Disable
-            </button>
-            <button
-              onClick={() => handleToggle("openTracking", true)}
-              disabled={saving}
-              className={`px-4 py-2 text-xs font-semibold transition-all ${
-                openTracking
-                  ? "bg-[#3D8B5E] text-white"
-                  : "bg-white text-[#6B7570] hover:bg-[#F5F1EB]"
-              }`}
-            >
-              Enable
-            </button>
-          </div>
+          <EnabledBadge />
         </div>
       </div>
 
@@ -606,39 +576,13 @@ function OptionsTab({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1 rounded-xs border border-[#E8E2D8] overflow-hidden">
-            <button
-              onClick={() => handleToggle("linkTracking", false)}
-              disabled={saving}
-              className={`px-4 py-2 text-xs font-semibold transition-all ${
-                !linkTracking
-                  ? "bg-[#2A4A3A] text-white"
-                  : "bg-white text-[#6B7570] hover:bg-[#F5F1EB]"
-              }`}
-            >
-              Disable
-            </button>
-            <button
-              onClick={() => handleToggle("linkTracking", true)}
-              disabled={saving}
-              className={`px-4 py-2 text-xs font-semibold transition-all ${
-                linkTracking
-                  ? "bg-[#3D8B5E] text-white"
-                  : "bg-white text-[#6B7570] hover:bg-[#F5F1EB]"
-              }`}
-            >
-              Enable
-            </button>
-          </div>
+          <EnabledBadge />
         </div>
       </div>
 
-      {saving && (
-        <div className="flex items-center gap-2 text-[11px] text-[#6B7570]">
-          <Loader2 size={12} className="animate-spin" />
-          Saving...
-        </div>
-      )}
+      <p className="text-[11px] text-[#8A9590] px-1">
+        Tracking is enforced on all campaigns to keep open and click analytics consistent across your pipeline.
+      </p>
     </div>
   );
 }

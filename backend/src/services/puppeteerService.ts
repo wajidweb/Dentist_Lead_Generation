@@ -275,14 +275,30 @@ async function extractEmails(page: Page): Promise<string[]> {
   });
 
   // Junk filter — domains/prefixes that appear in third-party scripts, CDNs,
-  // trackers, or obvious placeholders. Also drop image-path matches.
+  // trackers, template placeholders, or obvious dummies. Also drop image-path
+  // matches. The big category we added: template-default addresses like
+  // `example@mysite.com` that ship on blank Wix/Duda/Squarespace templates —
+  // writing those to a lead ruins outreach (guaranteed bounce).
   const JUNK_DOMAINS = [
-    "sentry.io", "wixpress.com", "example.com", "domain.com", "email.com",
-    "localhost", "sentry-cdn.com", "googletagmanager.com", "google-analytics.com",
+    // Third-party scripts / trackers / CDNs
+    "sentry.io", "sentry-cdn.com", "wixpress.com",
+    "googletagmanager.com", "google-analytics.com", "googleapis.com",
     "doubleclick.net", "facebook.com", "fb.com", "instagram.com",
     "cloudflare.com", "jsdelivr.net", "unpkg.com", "gstatic.com",
+    "w3.org", "schema.org",
+    // Template / placeholder domains (the cause of `example@mysite.com`)
+    "example.com", "example.org", "example.net", "domain.com", "email.com",
+    "mysite.com", "yoursite.com", "yourdomain.com", "yourcompany.com",
+    "yourwebsite.com", "website.com", "test.com", "sample.com",
+    "placeholder.com", "company.com", "acme.com", "lorem.com", "ipsum.com",
+    "localhost",
   ];
-  const JUNK_PREFIXES = ["noreply", "no-reply", "donotreply", "do-not-reply"];
+  const JUNK_PREFIXES = [
+    "noreply", "no-reply", "donotreply", "do-not-reply",
+    // Template copy prefixes that pair with the junk domains above
+    "example", "youremail", "your-email", "name", "yourname", "user",
+    "john.doe", "jane.doe", "test", "sample",
+  ];
 
   return raw
     .map((e) => e.trim().toLowerCase())
@@ -293,6 +309,9 @@ async function extractEmails(page: Page): Promise<string[]> {
       if (!prefix || !domain) return false;
       if (JUNK_PREFIXES.includes(prefix)) return false;
       if (JUNK_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))) return false;
+      // Catch-all: any prefix starting with "example", "placeholder",
+      // "sample", or "dummy" regardless of domain — these are never real.
+      if (/^(example|placeholder|sample|dummy)[-_.]?/.test(prefix)) return false;
       return true;
     })
     .filter((e, i, arr) => arr.indexOf(e) === i); // dedupe

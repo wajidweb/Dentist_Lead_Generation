@@ -204,6 +204,10 @@ export async function searchDentists(
   targetLeads: number = 20,
   userEmail: string
 ) {
+  // Hard cap at 100 leads per search. Higher values rapidly burn Google
+  // Places quota AND downstream Claude/Hunter/Cloudinary cost. The frontend
+  // also enforces this; this clamp is a safety net for direct API calls.
+  targetLeads = Math.max(1, Math.min(100, Math.floor(targetLeads) || 20));
   const { city, state } = parseLocation(location);
   const progress = await getOrCreateProgress(location, userEmail);
 
