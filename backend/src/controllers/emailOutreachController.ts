@@ -59,7 +59,7 @@ export const preview = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const senderName = req.userEmail ?? "Your Name";
+    const senderName = "Thanks";
     const analysis = lead.websiteAnalysis;
     const vars: EmailTemplateVariables = {
       businessName: lead.businessName,
