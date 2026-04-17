@@ -592,7 +592,7 @@ export default function LeadsPage() {
                                 className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#C75555]/10 text-[#C75555]"
                                 title="Site is protected by Cloudflare — website analysis was skipped"
                               >
-                                CF Blocked
+                                Cloudflare Blocked
                               </span>
                             )}
                             {(() => {
