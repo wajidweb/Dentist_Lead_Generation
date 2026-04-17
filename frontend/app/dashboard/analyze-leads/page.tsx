@@ -26,7 +26,7 @@ import {
   Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useLeadsStore, AnalysisStatus } from "../../store/leadsStore";
+import { useLeadsStore } from "../../store/leadsStore";
 
 const statusConfig: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   discovered:      { bg: "bg-[#F5F1EB]",      text: "text-[#5A6B60]",  dot: "bg-[#8A9590]",  label: "Discovered" },
@@ -78,7 +78,7 @@ export default function AnalyzeLeadsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"pending" | "all">("pending");
-  const [emailProvider, setEmailProvider] = useState<"harvester" | "hunter">("harvester");
+  const emailProvider: "harvester" = "harvester";
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -295,29 +295,6 @@ export default function AnalyzeLeadsPage() {
             <p className="text-sm text-[#6B7570] mt-1">Review and mark leads as analyzed to move them through the pipeline</p>
           </div>
           <div className="grid grid-cols-2 sm:flex sm:items-center gap-2.5">
-            {/* Email Provider Toggle */}
-            <div className="flex items-center bg-white border border-[#CCC7BE] rounded-xs overflow-hidden col-span-2 sm:col-span-1">
-              <button
-                onClick={() => setEmailProvider("harvester")}
-                className={`px-3 py-2.5 text-xs font-semibold transition-all duration-200 ${
-                  emailProvider === "harvester"
-                    ? "bg-[#2A4A3A] text-white"
-                    : "text-[#5A6B60] hover:bg-[#F5F1EB]"
-                }`}
-              >
-                theHarvester
-              </button>
-              <button
-                onClick={() => setEmailProvider("hunter")}
-                className={`px-3 py-2.5 text-xs font-semibold transition-all duration-200 ${
-                  emailProvider === "hunter"
-                    ? "bg-[#2A4A3A] text-white"
-                    : "text-[#5A6B60] hover:bg-[#F5F1EB]"
-                }`}
-              >
-                Hunter.io
-              </button>
-            </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`px-4 py-2.5 rounded-xs font-medium text-sm border transition-all duration-200 flex items-center justify-center gap-2 ${
@@ -650,7 +627,7 @@ export default function AnalyzeLeadsPage() {
                             {lead.cloudflareBlocked && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#C75555]/10 text-[#C75555]" title="Site is protected by Cloudflare — website analysis was skipped">
                                 <AlertCircle size={10} />
-                                CF Blocked
+                                Cloudflare Blocked
                               </span>
                             )}
                             {lead.analyzed && !lead.cloudflareBlocked && (
@@ -814,7 +791,7 @@ export default function AnalyzeLeadsPage() {
                             {lead.cloudflareBlocked && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#C75555]/10 text-[#C75555]" title="Site is protected by Cloudflare — website analysis was skipped">
                                 <AlertCircle size={10} />
-                                CF Blocked
+                                Cloudflare Blocked
                               </span>
                             )}
                             {lead.analyzed && !lead.cloudflareBlocked && (

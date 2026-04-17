@@ -10,7 +10,7 @@ import CityAutocomplete from "../../components/CityAutocomplete";
 export default function SearchPage() {
   const { results, history, loading, historyLoading, error, searchDentists, fetchSearchHistory, deleteSearchHistory, clearResults, resetSearchProgress } = useSearchStore();
 
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState("New York, NY, USA");
   const [minRating, setMinRating] = useState("3.5");
   const [minReviews, setMinReviews] = useState("10");
   const [targetLeads, setTargetLeads] = useState("20");
