@@ -298,13 +298,48 @@ export interface InstantlyEmailAccount {
 }
 
 export async function listEmailAccounts(): Promise<InstantlyEmailAccount[]> {
-  const result = await requestWithRetry("GET", "/accounts");
-  if (Array.isArray(result)) return result as InstantlyEmailAccount[];
-  // V2 may return { items: [...] } or { data: [...] }
-  const obj = result as Record<string, unknown> | null;
-  if (obj && Array.isArray(obj.items)) return obj.items as InstantlyEmailAccount[];
-  if (obj && Array.isArray(obj.data)) return obj.data as InstantlyEmailAccount[];
-  return [];
+  // Instantly V2 paginates /accounts. Loop using `starting_after` cursor
+  // until no more pages. Hard cap at 50 pages (50 * 100 = 5,000 accounts)
+  // as a safety net against a bad cursor response turning this into a loop.
+  const PAGE_SIZE = 100;
+  const MAX_PAGES = 50;
+  const all: InstantlyEmailAccount[] = [];
+  let startingAfter: string | undefined;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const qs = new URLSearchParams({ limit: String(PAGE_SIZE) });
+    if (startingAfter) qs.set("starting_after", startingAfter);
+
+    const result = await requestWithRetry("GET", `/accounts?${qs.toString()}`);
+
+    let items: InstantlyEmailAccount[] = [];
+    let nextCursor: string | undefined;
+
+    if (Array.isArray(result)) {
+      items = result as InstantlyEmailAccount[];
+    } else if (result && typeof result === "object") {
+      const obj = result as Record<string, unknown>;
+      if (Array.isArray(obj.items)) items = obj.items as InstantlyEmailAccount[];
+      else if (Array.isArray(obj.data)) items = obj.data as InstantlyEmailAccount[];
+
+      // Instantly returns the next cursor under various names depending on endpoint
+      const cursor =
+        obj.next_starting_after ??
+        obj.starting_after ??
+        obj.next_cursor ??
+        obj.cursor;
+      if (typeof cursor === "string" && cursor.length > 0) nextCursor = cursor;
+    }
+
+    all.push(...items);
+
+    // Stop when: no items returned, fewer than page size (last page), or no cursor
+    if (items.length === 0 || items.length < PAGE_SIZE || !nextCursor) break;
+    startingAfter = nextCursor;
+  }
+
+  console.log(`[Instantly] Fetched ${all.length} email accounts total`);
+  return all;
 }
 
 export async function getEmailAccountStatus(
